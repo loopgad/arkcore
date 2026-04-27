@@ -1,0 +1,103 @@
+[package]
+name = "arkcore"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+authors = ["ArkCore Team"]
+description = "Local-First OS Agent Engine"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# ========== Web 框架 ==========
+axum = { version = "0.8", features = ["ws"] }
+tokio = { version = "1.52", features = ["full"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors"] }
+
+# ========== Dioxus Web UI ==========
+dioxus = { version = "0.7", features = ["web", "signals"] }
+dioxus-router = { version = "0.7", features = ["html"] }
+
+# ========== Web UI 额外 ==========
+wasm-bindgen = "0.2"
+getrandom = { version = "0.2", features = ["js"] }
+console_error_panic_hook = "0.1"
+web-sys = { version = "0.3", features = [
+    "console",
+    "Window",
+    "Document",
+    "Element",
+    "HtmlElement",
+    "CssStyleDeclaration",
+    "EventTarget",
+    "Event",
+    "KeyboardEvent",
+    "MouseEvent",
+] }
+
+# ========== CLI/REPL ==========
+clap = { version = "4.6", features = ["derive", "wrap_help"] }
+rustyline = "18"
+clap_complete = "4.6"
+
+# ========== 数据库 ==========
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio"] }
+
+# ========== 异步流 ==========
+futures-util = "0.3"
+tokio-stream = "0.1"
+tokio-util = { version = "0.7", features = ["io"] }
+tokio-stream-util = "0.2"
+tokio-tungstenite = "0.29"
+futures-channel = "0.3"
+
+# ========== 工具 ==========
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+toml = "0.8"
+dirs = "6"
+hostname = "0.4"
+anyhow = "1.0"
+thiserror = "2.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+console = "0.16"
+indicatif = "0.18"
+
+# ========== 时间处理 ==========
+chrono = { version = "0.4", features = ["serde"] }
+
+# ========== 安全相关 ==========
+validator = { version = "0.19", features = ["derive"] }
+aes-gcm = "0.10"
+rand = "0.8"
+sha2 = "0.10"
+base64 = "0.22"
+zeroize = { version = "1.8", features = ["derive"] }
+pbkdf2 = "0.12"
+hmac = "0.12"
+
+# ========== 性能优化 ==========
+moka = { version = "0.12", features = ["sync"] }
+bbqueue = "0.4"
+ahash = "0.8"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_Console"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"
+mockall = "0.13"
+criterion = { version = "0.5", features = ["html_reports"] }
+tokio-test = "0.4"
+
+[features]
+default = []
+
+[[bench]]
+name = "benchmark"
+harness = false
