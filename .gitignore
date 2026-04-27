@@ -1,0 +1,23 @@
+# Rust build output
+target/
+Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*.bk
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Sisyphus (开发工具)
+.sisyphus/
+
+# Rust
+*.pdb
+
+# Optional: Keep Cargo.lock for binary builds
+# If you want deterministic builds, comment this out
