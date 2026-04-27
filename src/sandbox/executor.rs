@@ -398,7 +398,7 @@ mod tests {
     async fn test_whitelist_allows_cat() {
         let sandbox = Sandbox::new().unwrap();
         // cat 在白名单中
-        let result = sandbox.execute("cat /etc/passwd").await.unwrap();
+        let _result = sandbox.execute("cat /etc/passwd").await.unwrap();
         // cat 可能存在，但安全检测应该通过
         // 注意: 实际结果取决于 /etc/passwd 是否存在
     }

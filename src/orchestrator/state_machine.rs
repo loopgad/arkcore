@@ -4,6 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use tracing::info;
 
 /// Agent 状态枚举
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -59,7 +60,7 @@ impl AgentStateMachine {
 
     /// 执行状态转换
     pub fn transition(&mut self, new_state: AgentState) {
-        eprintln!("状态转换: {:?} -> {:?}", self.state, new_state);
+        info!("状态转换: {:?} -> {:?}", self.state, new_state);
         self.history.push(self.state.clone());
 
         // 保持历史记录在限制内
