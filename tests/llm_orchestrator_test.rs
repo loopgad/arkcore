@@ -326,7 +326,7 @@ async fn test_orchestrator_reset_and_rerun() {
     assert!(orch.is_terminal());
 
     // 重置
-    orch.reset();
+    orch.reset().await;
 
     // 重置后：非终止状态
     assert!(!orch.is_terminal());

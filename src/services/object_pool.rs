@@ -356,4 +356,117 @@ mod tests {
         assert_eq!(stats.string_buffer_pool_size, 0);
         assert_eq!(stats.byte_buffer_pool_size, 0);
     }
+
+    #[test]
+    fn test_object_pool_config_development() {
+        let config = ObjectPoolConfig::development();
+        assert_eq!(config.pool_size, 8);
+        assert_eq!(config.string_buffer_capacity, 1024);
+        assert_eq!(config.byte_buffer_capacity, 2048);
+    }
+
+    #[tokio::test]
+    async fn test_pooled_string_buffer_methods() {
+        let mut buffer = PooledStringBuffer::new(1024);
+
+        // 测试 capacity
+        assert!(buffer.capacity() >= 1024);
+
+        // 测试 len 和 is_empty
+        assert!(buffer.is_empty());
+        assert_eq!(buffer.len(), 0);
+
+        // 测试 as_str_mut 和 clear
+        buffer.as_str_mut().push_str("test");
+        assert_eq!(buffer.len(), 4);
+        assert_eq!(buffer.as_str(), "test");
+
+        buffer.clear();
+        assert!(buffer.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_pooled_byte_buffer_methods() {
+        let mut buffer = PooledByteBuffer::new(2048);
+
+        // 测试 capacity
+        assert!(buffer.capacity() >= 2048);
+
+        // 测试 len 和 is_empty
+        assert!(buffer.is_empty());
+        assert_eq!(buffer.len(), 0);
+
+        // 测试 as_vec_mut
+        buffer.as_vec_mut().extend_from_slice(b"bytes");
+        assert_eq!(buffer.len(), 5);
+        assert_eq!(buffer.as_slice(), b"bytes");
+
+        buffer.clear();
+        assert!(buffer.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_string_buffer_pool_exceed_max_size() {
+        let config = ObjectPoolConfig {
+            pool_size: 2,
+            string_buffer_capacity: 4096,
+            byte_buffer_capacity: 8192,
+        };
+        let pool = StringBufferPool::new(&config);
+
+        // 获取两个 buffer 并释放，池应该达到 max_size
+        let buf1 = pool.acquire().await;
+        let buf2 = pool.acquire().await;
+        pool.release(buf1).await;
+        pool.release(buf2).await;
+        assert_eq!(pool.pool_size().await, 2);
+
+        // 再获取一个 buffer 释放后，池大小不应超过 max_size
+        let buf3 = pool.acquire().await;
+        pool.release(buf3).await;
+        assert_eq!(pool.pool_size().await, 2); // 保持为 2
+    }
+
+    #[tokio::test]
+    async fn test_byte_buffer_pool_exceed_max_size() {
+        let config = ObjectPoolConfig {
+            pool_size: 3,
+            string_buffer_capacity: 4096,
+            byte_buffer_capacity: 8192,
+        };
+        let pool = ByteBufferPool::new(&config);
+
+        // 获取多个 buffer 而不立即释放
+        let mut buffers = Vec::new();
+        for _ in 0..5 {
+            buffers.push(pool.acquire().await);
+        }
+
+        // 全部释放后，池大小不应超过 max_size
+        for buf in buffers {
+            pool.release(buf).await;
+        }
+        // 池应该保持在 max_size 或更小
+        assert!(pool.pool_size().await <= 3);
+    }
+
+    #[tokio::test]
+    async fn test_object_pool_manager_pools() {
+        let manager = ObjectPoolManager::new(ObjectPoolConfig::default());
+
+        // 验证两个池都存在
+        assert!(manager.string_pool() as *const _ != std::ptr::null());
+        assert!(manager.byte_pool() as *const _ != std::ptr::null());
+    }
+
+    #[tokio::test]
+    async fn test_create_global_object_pool() {
+        let pool = create_global_object_pool();
+        let stats = pool.stats().await;
+
+        assert_eq!(stats.string_buffer_pool_size, 0);
+        assert_eq!(stats.byte_buffer_pool_size, 0);
+        assert_eq!(stats.string_buffer_allocated, 16);
+        assert_eq!(stats.byte_buffer_allocated, 16);
+    }
 }

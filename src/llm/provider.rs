@@ -190,11 +190,12 @@ impl LlmProviderTrait for OllamaProvider {
     type Error = LlmError;
 
     fn stream_chat(&self, messages: &[Message]) -> Result<Vec<StreamEvent>, Self::Error> {
-        // 同步版本：使用 block_on
-        let runtime = tokio::runtime::Runtime::new()
-            .map_err(|e| LlmError::ConfigError(format!("Failed to create runtime: {}", e)))?;
-
-        runtime.block_on(self.stream_chat_async(messages))
+        // 使用 Handle::current().block_on() 在已有 runtime 上下文中调用异步代码
+        // 如果没有 runtime 上下文（如在 spawn_blocking 中），这会 panic
+        // 因此该方法只能在 async 上下文中调用
+        let messages = messages.to_vec();
+        tokio::runtime::Handle::current()
+            .block_on(self.stream_chat_async(&messages))
     }
 
     fn model_name(&self) -> &str {

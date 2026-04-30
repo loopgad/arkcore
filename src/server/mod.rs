@@ -254,15 +254,98 @@ async fn ws_handler(ws: WebSocketUpgrade) -> impl IntoResponse {
     ws.on_upgrade(handle_socket)
 }
 
+/// WebSocket 配置常量
+mod ws_config {
+    /// 最大消息大小 (1MB)
+    pub const MAX_MESSAGE_SIZE: usize = 1024 * 1024;
+    /// 最大每连接消息数
+    pub const MAX_MESSAGES_PER_CONN: usize = 10000;
+    /// 空闲超时 (秒)
+    pub const IDLE_TIMEOUT_SECS: u64 = 300;
+    /// 回话最大存活时间 (秒)
+    pub const MAX_SESSION_SECS: u64 = 3600;
+}
+
 /// WebSocket 消息处理
 async fn handle_socket(socket: WebSocket) {
     let (mut sender, mut receiver) = socket.split();
 
-    while let Some(msg) = futures_util::StreamExt::next(&mut receiver).await {
-        if let Ok(axum::extract::ws::Message::Text(text)) = msg {
+    // 消息计数器，用于限制每连接消息数
+    let mut msg_count: usize = 0;
+    // 连接开始时间
+    let start_time = std::time::Instant::now();
+
+    loop {
+        // 检查会话最大存活时间
+        if start_time.elapsed().as_secs() > ws_config::MAX_SESSION_SECS {
             let _ = sender
-                .send(axum::extract::ws::Message::Text(text.to_string().into()))
+                .send(axum::extract::ws::Message::Text(
+                    r#"{"error":"session_timeout"}"#.into(),
+                ))
                 .await;
+            break;
+        }
+
+        // 使用 tokio::time::timeout 来实现空闲超时
+        let msg = tokio::time::timeout(
+            std::time::Duration::from_secs(ws_config::IDLE_TIMEOUT_SECS),
+            futures_util::StreamExt::next(&mut receiver),
+        )
+        .await;
+
+        match msg {
+            Ok(Some(Ok(axum::extract::ws::Message::Text(text)))) => {
+                // 检查消息大小
+                if text.len() > ws_config::MAX_MESSAGE_SIZE {
+                    let _ = sender
+                        .send(axum::extract::ws::Message::Text(
+                            r#"{"error":"message_too_large"}"#.into(),
+                        ))
+                        .await;
+                    break;
+                }
+
+                msg_count += 1;
+
+                // 检查消息数限制
+                if msg_count > ws_config::MAX_MESSAGES_PER_CONN {
+                    let _ = sender
+                        .send(axum::extract::ws::Message::Text(
+                            r#"{"error":"too_many_messages"}"#.into(),
+                        ))
+                        .await;
+                    break;
+                }
+
+                let _ = sender
+                    .send(axum::extract::ws::Message::Text(text.to_string().into()))
+                    .await;
+            }
+            Ok(Some(Ok(axum::extract::ws::Message::Close(_)))) => {
+                // 客户端关闭连接
+                break;
+            }
+            Ok(Some(Err(e))) => {
+                // WebSocket 错误
+                tracing::warn!("WebSocket 错误: {}", e);
+                break;
+            }
+            Ok(None) => {
+                // 连接已关闭
+                break;
+            }
+            Err(_) => {
+                // 空闲超时
+                let _ = sender
+                    .send(axum::extract::ws::Message::Text(
+                        r#"{"error":"idle_timeout"}"#.into(),
+                    ))
+                    .await;
+                break;
+            }
+            _ => {
+                // 忽略其他消息类型
+            }
         }
     }
 }

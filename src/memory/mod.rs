@@ -56,6 +56,9 @@ impl SkillMemory {
 
     /// 创建新的记忆引擎实例（文件数据库）
     pub async fn from_file(path: &str) -> Result<Self> {
+        // 验证路径安全，防止路径遍历攻击
+        Self::validate_path(path)?;
+
         let database_url = format!("sqlite:{}?mode=rwc", path);
         let pool = SqlitePoolOptions::new()
             .max_connections(1)
@@ -65,6 +68,56 @@ impl SkillMemory {
         let memory = Self { pool };
         memory.init_schema().await?;
         Ok(memory)
+    }
+
+    /// 验证路径安全，防止路径遍历攻击
+    fn validate_path(path: &str) -> Result<()> {
+        // 禁止空路径
+        if path.is_empty() {
+            anyhow::bail!("路径不能为空");
+        }
+
+        // 禁止绝对路径（安全考虑，只允许相对路径）
+        if path.starts_with('/') || path.starts_with('\\') {
+            anyhow::bail!("只允许相对路径，不允许绝对路径");
+        }
+
+        // 禁止路径遍历序列
+        if path.contains("..") || path.contains("~") {
+            anyhow::bail!("路径不允许包含 '..' 或 '~'");
+        }
+
+        // 禁止 null 字节
+        if path.contains('\0') {
+            anyhow::bail!("路径包含无效字符");
+        }
+
+        // 解析并规范化路径，检查是否产生遍历
+        let normalized = std::path::Path::new(path)
+            .components()
+            .fold(String::new(), |acc, comp| {
+                match comp {
+                    std::path::Component::Normal(name) => {
+                        if acc.is_empty() {
+                            name.to_string_lossy().to_string()
+                        } else {
+                            format!("{}/{}", acc, name.to_string_lossy())
+                        }
+                    }
+                    std::path::Component::ParentDir => {
+                        // 检测到 .. 说明有路径遍历
+                        acc
+                    }
+                    _ => acc,
+                }
+            });
+
+        // 如果规范化后的路径包含 ..，说明有遍历尝试
+        if normalized.contains("..") {
+            anyhow::bail!("检测到路径遍历尝试");
+        }
+
+        Ok(())
     }
 
     /// 初始化数据库 schema

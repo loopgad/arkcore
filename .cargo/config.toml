@@ -1,0 +1,22 @@
+# ArkCore 构建配置
+# 优化编译选项，平衡开发体验与构建体积
+
+[build]
+# 禁用增量编译 - 根本解决 target 膨胀问题
+# 增量编译会累积缓存到数GB，每次全量编译换取清洁构建
+incremental = false
+
+[profile.dev]
+# 开发模式优化
+opt-level = 0
+debug = "line-tables-only"  # 仅保留行号，支持堆栈跟踪
+
+[profile.dev.package."*"]
+# 依赖库使用更高优化级别，加快编译
+opt-level = 1
+
+[profile.release]
+# 发布模式优化
+lto = "thin"       # 启用 Thin LTO，减少二进制大小
+codegen-units = 1  # 单 codegen unit，优化生成代码
+strip = true       # 剥离符号表

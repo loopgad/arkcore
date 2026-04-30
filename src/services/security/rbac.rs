@@ -329,10 +329,10 @@ impl RbacService {
             .find(|r| r.resource_action.resource_type == resource_type && r.resource_action.action == action)
             .map(|r| r.required_permission);
 
-        // 如果没有规则, 默认允许
+        // 如果没有规则, 默认拒绝 (安全默认值)
         let required = match required_permission {
             Some(p) => p,
-            None => return PermissionCheckResult::allowed(),
+            None => return PermissionCheckResult::denied("未定义的资源操作，默认拒绝", None),
         };
 
         // 检查权限

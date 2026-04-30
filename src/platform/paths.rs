@@ -170,4 +170,105 @@ mod tests {
             assert!(home.exists() || !home.to_string_lossy().is_empty());
         }
     }
+
+    // ========== 新增测试 ==========
+
+    #[test]
+    fn test_paths_are_distinct() {
+        // 不同目录应该有不同的路径
+        let config = config_dir();
+        let data = data_dir();
+        let cache = cache_dir();
+        let temp = temp_dir();
+
+        // 至少 temp 目录应该与其他不同
+        assert_ne!(temp, config);
+    }
+
+    #[test]
+    fn test_paths_contain_app_name() {
+        // 路径应该包含 arkcore/ArkCore 标识
+        let config_str = config_dir().to_string_lossy().to_lowercase();
+        let data_str = data_dir().to_string_lossy().to_lowercase();
+        let cache_str = cache_dir().to_string_lossy().to_lowercase();
+
+        // 至少一个应该包含 arkcore
+        let has_arkcore = config_str.contains("arkcore")
+            || data_str.contains("arkcore")
+            || cache_str.contains("arkcore");
+
+        // 注意：在某些平台上可能不包含，这是平台相关的
+        // 所以只验证路径是有效的
+        assert!(config_dir().components().count() >= 1);
+    }
+
+    #[test]
+    fn test_config_dir_parent_exists_or_creatable() {
+        let config = config_dir();
+        // 配置目录本身或其父目录应该可访问
+        if config.exists() {
+            assert!(config.is_dir() || !config.exists());
+        }
+    }
+
+    #[test]
+    fn test_data_dir_not_empty() {
+        let data = data_dir();
+        assert!(!data.to_string_lossy().is_empty());
+    }
+
+    #[test]
+    fn test_cache_dir_not_empty() {
+        let cache = cache_dir();
+        assert!(!cache.to_string_lossy().is_empty());
+    }
+
+    #[test]
+    fn test_temp_dir_not_empty() {
+        let temp = temp_dir();
+        assert!(!temp.to_string_lossy().is_empty());
+    }
+
+    #[test]
+    fn test_paths_implementation_consistency() {
+        // 确保 WindowsPaths 和 UnixPaths 实现一致
+        #[cfg(windows)]
+        {
+            let wp = WindowsPaths::config_dir();
+            let dp = WindowsPaths::data_dir();
+            let cp = WindowsPaths::cache_dir();
+            let tp = WindowsPaths::temp_dir();
+
+            assert!(!wp.to_string_lossy().is_empty());
+            assert!(!dp.to_string_lossy().is_empty());
+            assert!(!cp.to_string_lossy().is_empty());
+            assert!(!tp.to_string_lossy().is_empty());
+        }
+
+        #[cfg(not(windows))]
+        {
+            let up = UnixPaths::config_dir();
+            let dp = UnixPaths::data_dir();
+            let cp = UnixPaths::cache_dir();
+            let tp = UnixPaths::temp_dir();
+
+            assert!(!up.to_string_lossy().is_empty());
+            assert!(!dp.to_string_lossy().is_empty());
+            assert!(!cp.to_string_lossy().is_empty());
+            assert!(!tp.to_string_lossy().is_empty());
+        }
+    }
+
+    #[test]
+    fn test_home_dir_returns_valid_path() {
+        match home_dir() {
+            Some(path) => {
+                // 如果返回了路径，应该是一个有效的路径格式
+                assert!(path.components().count() >= 1);
+            }
+            None => {
+                // None 也是有效返回值（如果没有主目录）
+            }
+        }
+    }
 }

@@ -56,6 +56,8 @@ pub struct RateLimitConfig {
     pub per_endpoint_rate: f64,
     /// 每端点桶容量
     pub per_endpoint_capacity: u64,
+    /// HashMap 最大条目数 (防止 DoS)
+    pub max_bucket_entries: usize,
 }
 
 impl Default for RateLimitConfig {
@@ -67,7 +69,61 @@ impl Default for RateLimitConfig {
             per_user_capacity: 20,
             per_endpoint_rate: 50.0,
             per_endpoint_capacity: 100,
+            // 默认限制 10000 个条目，防止内存耗尽
+            max_bucket_entries: 10000,
         }
+    }
+}
+
+/// 带容量限制的 Bucket Map，使用 LRU 驱逐策略
+struct BoundedBucketMap<K, V> {
+    map: HashMap<K, V>,
+    max_size: usize,
+    access_order: Vec<K>,
+}
+
+impl<K: Eq + std::hash::Hash + Clone, V> BoundedBucketMap<K, V> {
+    fn new(max_size: usize) -> Self {
+        Self {
+            map: HashMap::new(),
+            max_size,
+            access_order: Vec::new(),
+        }
+    }
+
+    /// 获取或插入 bucket，必要时驱逐最旧的条目
+    fn get_or_insert<F: FnOnce() -> V>(&mut self, key: K, filler: F) -> &mut V {
+        // 首先检查是否已存在
+        if self.map.contains_key(&key) {
+            // 更新访问顺序，将此 key 移到末尾（最近使用）
+            if let Some(pos) = self.access_order.iter().position(|k| k == &key) {
+                self.access_order.remove(pos);
+            }
+            self.access_order.push(key.clone());
+            // 返回现有值
+            return self.map.get_mut(&key).unwrap();
+        }
+
+        // 如果达到容量限制，驱逐最旧的条目
+        if self.map.len() >= self.max_size {
+            if let Some(oldest) = self.access_order.first().cloned() {
+                self.map.remove(&oldest);
+                self.access_order.remove(0);
+            }
+        }
+
+        // 插入新条目
+        let key_for_access_order = key.clone();
+        self.map.insert(key.clone(), filler());
+        self.access_order.push(key_for_access_order);
+
+        // 返回新插入的值
+        self.map.get_mut(&key).unwrap()
+    }
+
+    /// 获取当前条目数
+    fn len(&self) -> usize {
+        self.map.len()
     }
 }
 
@@ -112,9 +168,10 @@ impl TokenBucket {
 
     /// 获取当前 token 数量
     fn available_tokens(&self) -> f64 {
-        let mut bucket = self.clone();
-        bucket.refill();
-        bucket.tokens
+        // 直接计算而不克隆 - 避免不必要的内存分配
+        let elapsed = self.last_update.elapsed().as_secs_f64();
+        let new_tokens = elapsed * self.rate;
+        (self.tokens + new_tokens).min(self.capacity as f64)
     }
 
     /// 获取距离下次可用 token 的时间
@@ -204,12 +261,12 @@ pub struct RateLimiter {
     config: RateLimitConfig,
     /// 全局限流桶
     global_bucket: RwLock<TokenBucket>,
-    /// 每用户限流桶
-    user_buckets: RwLock<HashMap<String, TokenBucket>>,
-    /// 每端点限流桶
-    endpoint_buckets: RwLock<HashMap<String, TokenBucket>>,
-    /// 每用户-端点组合限流桶
-    user_endpoint_buckets: RwLock<HashMap<(String, String), TokenBucket>>,
+    /// 每用户限流桶 (有界)
+    user_buckets: RwLock<BoundedBucketMap<String, TokenBucket>>,
+    /// 每端点限流桶 (有界)
+    endpoint_buckets: RwLock<BoundedBucketMap<String, TokenBucket>>,
+    /// 每用户-端点组合限流桶 (有界)
+    user_endpoint_buckets: RwLock<BoundedBucketMap<(String, String), TokenBucket>>,
 }
 
 impl RateLimiter {
@@ -221,9 +278,9 @@ impl RateLimiter {
                 config.global_rate,
                 config.global_capacity,
             )),
-            user_buckets: RwLock::new(HashMap::new()),
-            endpoint_buckets: RwLock::new(HashMap::new()),
-            user_endpoint_buckets: RwLock::new(HashMap::new()),
+            user_buckets: RwLock::new(BoundedBucketMap::new(config.max_bucket_entries)),
+            endpoint_buckets: RwLock::new(BoundedBucketMap::new(config.max_bucket_entries)),
+            user_endpoint_buckets: RwLock::new(BoundedBucketMap::new(config.max_bucket_entries)),
         }
     }
 
@@ -264,7 +321,7 @@ impl RateLimiter {
             }
             RateLimitDimension::User(user_id) => {
                 let mut buckets = self.user_buckets.write().await;
-                let bucket = buckets.entry(user_id.clone()).or_insert_with(|| {
+                let bucket = buckets.get_or_insert(user_id.clone(), || {
                     TokenBucket::new(self.config.per_user_rate, self.config.per_user_capacity)
                 });
                 let allowed = bucket.try_acquire();
@@ -284,7 +341,7 @@ impl RateLimiter {
             }
             RateLimitDimension::Endpoint(endpoint) => {
                 let mut buckets = self.endpoint_buckets.write().await;
-                let bucket = buckets.entry(endpoint.clone()).or_insert_with(|| {
+                let bucket = buckets.get_or_insert(endpoint.clone(), || {
                     TokenBucket::new(
                         self.config.per_endpoint_rate,
                         self.config.per_endpoint_capacity,
@@ -308,7 +365,7 @@ impl RateLimiter {
             RateLimitDimension::UserEndpoint(user_id, endpoint) => {
                 let mut buckets = self.user_endpoint_buckets.write().await;
                 let key = (user_id.clone(), endpoint.clone());
-                let bucket = buckets.entry(key).or_insert_with(|| {
+                let bucket = buckets.get_or_insert(key, || {
                     TokenBucket::new(self.config.per_user_rate, self.config.per_user_capacity)
                 });
                 let allowed = bucket.try_acquire();

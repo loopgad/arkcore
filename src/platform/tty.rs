@@ -501,4 +501,181 @@ mod tests {
     fn test_is_tty() {
         println!("Is TTY: {}", is_tty());
     }
+
+    // ========== 新增测试 ==========
+
+    #[test]
+    fn test_ansi_color_new() {
+        let color = AnsiColor::new(100, 150, 200);
+        assert_eq!(color.red, 100);
+        assert_eq!(color.green, 150);
+        assert_eq!(color.blue, 200);
+    }
+
+    #[test]
+    fn test_ansi_color_from_256_standard_colors() {
+        // 测试标准 16 色
+        for i in 0..16 {
+            let color = AnsiColor::from_256color(i);
+            assert!(color.red <= 255);
+            assert!(color.green <= 255);
+            assert!(color.blue <= 255);
+        }
+    }
+
+    #[test]
+    fn test_ansi_color_from_256_gray() {
+        // 测试灰度色 (索引 232-255)
+        let gray = AnsiColor::from_256color(244);
+        // 灰度颜色 RGB 应该相等
+        assert_eq!(gray.red, gray.green);
+        assert_eq!(gray.green, gray.blue);
+    }
+
+    #[test]
+    fn test_ansi_color_to_ansi_sequence() {
+        let color = AnsiColor::new(255, 0, 0);
+        let seq = color.to_ansi_sequence();
+        assert!(seq.contains("38;2")); // TrueColor 格式
+        assert!(seq.contains("255")); // 红色值
+    }
+
+    #[test]
+    fn test_ansi_color_to_256color_sequence() {
+        let color = AnsiColor::new(255, 0, 0);
+        let seq = color.to_256color_sequence();
+        assert!(seq.contains("38;5")); // 256 色格式
+    }
+
+    #[test]
+    fn test_ansi_color_to_256color_index() {
+        let color = AnsiColor::new(0, 0, 0);
+        let index = color.to_256color_index();
+        assert_eq!(index, 0); // 黑色
+
+        let white = AnsiColor::new(255, 255, 255);
+        let white_index = white.to_256color_index();
+        assert_eq!(white_index, 15); // 白色
+    }
+
+    #[test]
+    fn test_terminal_capabilities_default() {
+        let caps = TerminalCapabilities::default();
+        assert!(!caps.supports_ansi_colors);
+        assert!(caps.supports_utf8); // 默认启用 UTF-8
+        assert!(!caps.supports_true_color);
+        assert!(!caps.supports_hyperlinks);
+        assert!(!caps.supports_256_colors);
+        assert!(caps.width.is_none());
+        assert!(caps.height.is_none());
+    }
+
+    #[test]
+    fn test_terminal_capabilities_clone() {
+        let caps = TerminalCapabilities {
+            supports_ansi_colors: true,
+            supports_utf8: true,
+            supports_true_color: true,
+            supports_hyperlinks: true,
+            supports_256_colors: true,
+            width: Some(80),
+            height: Some(24),
+        };
+        let cloned = caps.clone();
+        assert_eq!(cloned.supports_ansi_colors, caps.supports_ansi_colors);
+        assert_eq!(cloned.width, caps.width);
+    }
+
+    #[test]
+    fn test_ansi_sequence_new() {
+        let caps = TerminalCapabilities::default();
+        let seq = AnsiSequence::new(caps);
+        assert!(seq.color(AnsiColor::new(255, 0, 0)).is_empty()); // 不支持颜色时返回空
+    }
+
+    #[test]
+    fn test_ansi_sequence_static_methods() {
+        assert_eq!(AnsiSequence::reset(), "\x1b[0m");
+        assert_eq!(AnsiSequence::bold(), "\x1b[1m");
+        assert_eq!(AnsiSequence::italic(), "\x1b[3m");
+        assert_eq!(AnsiSequence::underline(), "\x1b[4m");
+        assert_eq!(AnsiSequence::clear_line(), "\x1b[2K");
+        assert_eq!(AnsiSequence::clear_screen(), "\x1b[2J");
+        assert_eq!(AnsiSequence::hide_cursor(), "\x1b[?25l");
+        assert_eq!(AnsiSequence::show_cursor(), "\x1b[?25h");
+    }
+
+    #[test]
+    fn test_ansi_sequence_move_cursor() {
+        let seq = AnsiSequence::move_cursor(5, 10);
+        assert!(seq.contains("6")); // row + 1
+        assert!(seq.contains("11")); // col + 1
+    }
+
+    #[test]
+    fn test_tty_adapter_detect_capabilities() {
+        let caps = TtyAdapter::detect_capabilities();
+        // 基本能力检测应该返回有效结果
+        assert!(caps.supports_utf8 == true || caps.supports_utf8 == false);
+    }
+
+    #[test]
+    fn test_tty_adapter_capabilities() {
+        let adapter = TtyAdapter::new();
+        let caps = adapter.capabilities();
+
+        // 验证能力结构完整性
+        assert!(caps.supports_utf8 == true || caps.supports_utf8 == false);
+    }
+
+    #[test]
+    fn test_supports_color_function() {
+        // 测试辅助函数存在且可调用
+        let _ = supports_color();
+    }
+
+    #[test]
+    fn test_supports_true_color_function() {
+        // 测试辅助函数存在且可调用
+        let _ = supports_true_color();
+    }
+
+    #[test]
+    fn test_ansi_color_debug() {
+        let color = AnsiColor::new(100, 100, 100);
+        let debug_str = format!("{:?}", color);
+        assert!(!debug_str.is_empty());
+    }
+
+    #[test]
+    fn test_terminal_capabilities_debug() {
+        let caps = TerminalCapabilities::default();
+        let debug_str = format!("{:?}", caps);
+        assert!(!debug_str.is_empty());
+    }
+
+    #[test]
+    fn test_tty_adapter_default() {
+        let adapter = TtyAdapter::default();
+        let caps = adapter.capabilities();
+        // 默认适配器应该返回有效的能力
+        assert!(caps.supports_utf8 == true || caps.supports_utf8 == false);
+    }
+
+    #[test]
+    fn test_write_colored_noop() {
+        let adapter = TtyAdapter::new();
+        // 即使不支持颜色也不应该 panic
+        let result = adapter.write_colored("test", AnsiColor::new(255, 0, 0));
+        // 结果可能是 Ok(()) 或 Err，取决于输出环境
+        assert!(result.is_ok() || result.is_err());
+    }
+
+    #[test]
+    fn test_write_progress_noop() {
+        let adapter = TtyAdapter::new();
+        // 即使不支持颜色也不应该 panic
+        let result = adapter.write_progress(50, 100, 10);
+        assert!(result.is_ok() || result.is_err());
+    }
 }

@@ -299,4 +299,136 @@ mod tests {
         #[cfg(not(windows))]
         assert_eq!(path_separator(), ':');
     }
+
+    // ========== 新增测试 ==========
+
+    #[test]
+    fn test_command_translation_struct() {
+        let translation = CommandTranslation {
+            original: "ls -la".to_string(),
+            translated: "dir".to_string(),
+            was_translated: true,
+        };
+
+        assert!(translation.needs_translation());
+        assert_eq!(translation.original, "ls -la");
+        assert_eq!(translation.translated, "dir");
+    }
+
+    #[test]
+    fn test_custom_mappings_apply_no_match() {
+        let custom = CustomCommandMappings::new();
+        let result = custom.apply("unknown_cmd arg");
+        // 没有匹配的映射，应该返回原命令
+        assert_eq!(result, "unknown_cmd arg");
+    }
+
+    #[test]
+    fn test_custom_mappings_multiple() {
+        let mut custom = CustomCommandMappings::new();
+        custom.add_mapping("cmd1", "cmd1.exe");
+        custom.add_mapping("cmd2", "cmd2.exe");
+
+        // 只应用第一个匹配的映射
+        let result = custom.apply("cmd1 arg");
+        assert_eq!(result, "cmd1.exe arg");
+
+        let result2 = custom.apply("cmd2 arg");
+        assert_eq!(result2, "cmd2.exe arg");
+    }
+
+    #[test]
+    fn test_custom_mappings_replace_all_occurrences() {
+        let mut custom = CustomCommandMappings::new();
+        custom.add_mapping("test", "REPLACED");
+
+        // replacen 只替换第一个
+        let result = custom.apply("test test test");
+        assert_eq!(result, "REPLACED test test");
+    }
+
+    #[test]
+    fn test_windows_commands_translate_rm() {
+        #[cfg(windows)]
+        {
+            let result = translate_command("rm file.txt");
+            assert!(result.translated.contains("del"));
+            assert!(result.needs_translation());
+        }
+    }
+
+    #[test]
+    fn test_windows_commands_translate_cat() {
+        #[cfg(windows)]
+        {
+            let result = translate_command("cat file.txt");
+            assert!(result.translated.contains("type"));
+            assert!(result.needs_translation());
+        }
+    }
+
+    #[test]
+    fn test_windows_commands_translate_cp() {
+        #[cfg(windows)]
+        {
+            let result = translate_command("cp src dst");
+            assert!(result.translated.contains("copy"));
+            assert!(result.needs_translation());
+        }
+    }
+
+    #[test]
+    fn test_unix_commands_passthrough_all() {
+        #[cfg(not(windows))]
+        {
+            // 所有命令都应该直接通过
+            let cmds = ["ls", "cat", "grep", "awk", "sed", "sort"];
+            for cmd in cmds {
+                let result = translate_command(cmd);
+                assert!(!result.needs_translation());
+                assert_eq!(result.original, result.translated);
+            }
+        }
+    }
+
+    #[test]
+    fn test_shell_name_and_args() {
+        #[cfg(windows)]
+        {
+            assert_eq!(shell_name(), "cmd");
+            assert_eq!(shell_args(), &["/C"]);
+            assert_eq!(command_separator(), " & ");
+        }
+        #[cfg(not(windows))]
+        {
+            assert_eq!(shell_name(), "sh");
+            assert_eq!(shell_args(), &["-c"]);
+            assert_eq!(command_separator(), " && ");
+        }
+    }
+
+    #[test]
+    fn test_custom_mappings_default() {
+        let custom = CustomCommandMappings::default();
+        // 默认应该没有映射
+        let result = custom.apply("any_cmd");
+        assert_eq!(result, "any_cmd");
+    }
+
+    #[test]
+    fn test_custom_mappings_empty_key() {
+        let mut custom = CustomCommandMappings::new();
+        custom.add_mapping("", "replacement");
+        // 空键会匹配任何以该键开头的命令
+        // 这是当前实现的行为：空键意味着"以空字符串开头" = 匹配所有
+        let result = custom.apply("test");
+        assert_eq!(result, "replacementtest");
+    }
+
+    #[test]
+    fn test_translate_command_function() {
+        let result = translate_command("echo hello");
+        assert!(!result.original.is_empty());
+        assert!(!result.translated.is_empty());
+    }
 }

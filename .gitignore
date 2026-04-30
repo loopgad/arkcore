@@ -1,6 +1,8 @@
 # Rust build output
 target/
-Cargo.lock
+
+# Binary builds SHOULD keep Cargo.lock for reproducibility
+# Cargo.lock
 
 # IDE
 .idea/

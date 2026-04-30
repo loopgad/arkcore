@@ -385,4 +385,129 @@ mod tests {
         assert_eq!(hash1, hash2);
         assert_ne!(hash1, hash3);
     }
+
+    #[test]
+    fn test_cache_config_production() {
+        let config = CacheConfig::production();
+        assert_eq!(config.max_capacity, 10_000);
+    }
+
+    #[test]
+    fn test_cache_config_development() {
+        let config = CacheConfig::development();
+        assert_eq!(config.max_capacity, 1_000);
+        assert_eq!(config.llm_ttl, Duration::from_secs(60));
+    }
+
+    #[test]
+    fn test_config_cache_key_custom() {
+        let key1 = ConfigCacheKey::custom("my-key");
+        let key2 = ConfigCacheKey::custom("my-key");
+        let key3 = ConfigCacheKey::custom("other-key");
+
+        assert_eq!(key1, key2);
+        assert_ne!(key1, key3);
+        assert_ne!(key1, ConfigCacheKey::App);
+    }
+
+    #[test]
+    fn test_search_result_struct() {
+        let result = SearchResult {
+            id: "doc-123".to_string(),
+            score: 0.95,
+        };
+
+        assert_eq!(result.id, "doc-123");
+        assert_eq!(result.score, 0.95);
+    }
+
+    #[test]
+    fn test_llm_cache_entry() {
+        let entry = LlmCacheEntry {
+            response: "Hello".to_string(),
+            model: "gpt-4".to_string(),
+            created_at: std::time::SystemTime::now(),
+        };
+
+        assert_eq!(entry.response, "Hello");
+        assert_eq!(entry.model, "gpt-4");
+    }
+
+    #[test]
+    fn test_cache_stats_hit_rate() {
+        let stats = CacheStats {
+            llm_cache_size: 100,
+            search_cache_size: 50,
+            config_cache_size: 20,
+            hits: 80,
+            misses: 20,
+        };
+
+        assert_eq!(stats.hit_rate(), 0.8);
+    }
+
+    #[test]
+    fn test_cache_stats_hit_rate_zero_total() {
+        let stats = CacheStats {
+            llm_cache_size: 0,
+            search_cache_size: 0,
+            config_cache_size: 0,
+            hits: 0,
+            misses: 0,
+        };
+
+        assert_eq!(stats.hit_rate(), 0.0);
+    }
+
+    #[tokio::test]
+    async fn test_cache_manager_get_nonexistent() {
+        let manager = CacheManager::new(CacheConfig::default());
+
+        let key = LlmCacheKey::new("gpt-4", "nonexistent prompt");
+        let result = manager.get_llm_response(&key);
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_cache_invalidate_all() {
+        let manager = CacheManager::new(CacheConfig::default());
+
+        // 设置一些缓存
+        let key = LlmCacheKey::new("gpt-4", "test prompt");
+        manager.set_llm_response(key.clone(), "response".to_string(), "gpt-4".to_string());
+
+        // 验证存在
+        assert!(manager.get_llm_response(&key).is_some());
+
+        // 使失效
+        manager.invalidate_llm();
+
+        // 验证不存在
+        assert!(manager.get_llm_response(&key).is_none());
+    }
+
+    #[tokio::test]
+    async fn test_cache_stats() {
+        let manager = CacheManager::new(CacheConfig::default());
+
+        // 设置缓存
+        let key = LlmCacheKey::new("gpt-4", "test prompt");
+        manager.set_llm_response(key, "response".to_string(), "gpt-4".to_string());
+
+        let stats = manager.stats().await;
+        // 验证缓存统计数据正常
+        assert!(stats.llm_cache_size >= 0);
+        assert_eq!(stats.search_cache_size, 0);
+        assert_eq!(stats.config_cache_size, 0);
+    }
+
+    #[tokio::test]
+    async fn test_create_global_cache() {
+        let cache = create_global_cache();
+        let stats = cache.stats().await;
+
+        assert_eq!(stats.llm_cache_size, 0);
+        assert_eq!(stats.search_cache_size, 0);
+        assert_eq!(stats.config_cache_size, 0);
+    }
 }

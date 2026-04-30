@@ -9,7 +9,8 @@ pub use state_machine::{AgentState, AgentStateMachine};
 use crate::memory::SkillMemory;
 use crate::sandbox::Sandbox;
 use anyhow::Result;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 /// Orchestrator 主结构
 ///
@@ -45,17 +46,27 @@ impl Orchestrator {
 
     /// 获取当前状态
     pub fn current_state(&self) -> AgentState {
-        self.state_machine.read().unwrap().current_state().clone()
+        // 使用 try_read() 返回 Result，避免 panic
+        self.state_machine
+            .try_read()
+            .map(|guard| guard.current_state().clone())
+            .unwrap_or(AgentState::Idle)
     }
 
     /// 获取状态历史
     pub fn history(&self) -> Vec<AgentState> {
-        self.state_machine.read().unwrap().history().to_vec()
+        self.state_machine
+            .try_read()
+            .map(|guard| guard.history().to_vec())
+            .unwrap_or_default()
     }
 
     /// 检查是否处于终止状态
     pub fn is_terminal(&self) -> bool {
-        self.state_machine.read().unwrap().is_terminal()
+        self.state_machine
+            .try_read()
+            .map(|guard| guard.is_terminal())
+            .unwrap_or(true)
     }
 
     /// 执行任务
@@ -63,19 +74,19 @@ impl Orchestrator {
         // 规划阶段
         self.state_machine
             .write()
-            .unwrap()
+            .await
             .transition(AgentState::Planning { task: task.to_string() });
 
         // 模拟执行阶段
         let total_steps = 3;
         for step in 1..=total_steps {
-            if self.state_machine.read().unwrap().is_terminal() {
+            if self.state_machine.read().await.is_terminal() {
                 break;
             }
 
             self.state_machine
                 .write()
-                .unwrap()
+                .await
                 .transition(AgentState::Executing {
                     step,
                     total: total_steps,
@@ -89,7 +100,7 @@ impl Orchestrator {
         let result = "Task completed successfully".to_string();
         self.state_machine
             .write()
-            .unwrap()
+            .await
             .transition(AgentState::Completed { result: result.clone() });
 
         Ok(result)
@@ -100,7 +111,7 @@ impl Orchestrator {
         // 规划
         self.state_machine
             .write()
-            .unwrap()
+            .await
             .transition(AgentState::Planning { task: task.to_string() });
 
         // 安全检查
@@ -114,7 +125,7 @@ impl Orchestrator {
         // 等待审批
         self.state_machine
             .write()
-            .unwrap()
+            .await
             .transition(AgentState::AwaitingApproval {
                 command: command.to_string(),
                 risk_level: risk_level.clone(),
@@ -124,7 +135,7 @@ impl Orchestrator {
         if risk_level == "high" {
             self.state_machine
                 .write()
-                .unwrap()
+                .await
                 .transition(AgentState::Failed {
                     reason: "Security check failed".to_string(),
                 });
@@ -134,7 +145,7 @@ impl Orchestrator {
         // 执行
         self.state_machine
             .write()
-            .unwrap()
+            .await
             .transition(AgentState::Executing { step: 1, total: 1 });
 
         let result = self.sandbox.execute(command).await?;
@@ -149,7 +160,7 @@ impl Orchestrator {
         // 反思
         self.state_machine
             .write()
-            .unwrap()
+            .await
             .transition(AgentState::Reflecting {
                 assessment: if is_success {
                     "Command executed successfully".to_string()
@@ -161,15 +172,15 @@ impl Orchestrator {
         // 完成
         self.state_machine
             .write()
-            .unwrap()
+            .await
             .transition(AgentState::Completed { result: output.clone() });
 
         Ok(output)
     }
 
     /// 重置状态机
-    pub fn reset(&self) {
-        self.state_machine.write().unwrap().reset();
+    pub async fn reset(&self) {
+        self.state_machine.write().await.reset();
     }
 
     /// 获取记忆引用

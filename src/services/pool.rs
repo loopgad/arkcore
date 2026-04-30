@@ -285,4 +285,86 @@ mod tests {
         assert_eq!(snapshot.active, 5);
         assert_eq!(snapshot.idle, 3);
     }
+
+    #[test]
+    fn test_pool_config_development() {
+        let config = PoolConfig::development();
+        assert_eq!(config.max_connections, 5);
+        assert_eq!(config.min_connections, 1);
+        assert_eq!(config.connect_timeout, Duration::from_secs(10));
+    }
+
+    #[test]
+    fn test_pool_config_apply_to_sqlite() {
+        let config = PoolConfig::default();
+        let options = SqlitePoolOptions::new();
+        let _modified = config.apply_to_sqlite(options);
+        // 只验证 apply_to_sqlite 不 panic
+    }
+
+    #[tokio::test]
+    async fn test_metrics_snapshot_hit_rate() {
+        let metrics = PoolMetrics::new();
+
+        metrics.record_acquire(true).await;
+        metrics.record_acquire(true).await;
+        metrics.record_acquire(false).await;
+
+        let snapshot = metrics.snapshot().await;
+        assert_eq!(snapshot.acquire_total, 3);
+        assert_eq!(snapshot.acquire_errors, 1);
+        // 命中率 = (3 - 1) / 3 = 0.666...
+        assert!((snapshot.hit_rate() - 0.666).abs() < 0.01);
+    }
+
+    #[tokio::test]
+    async fn test_metrics_snapshot_hit_rate_no_requests() {
+        let snapshot = MetricsSnapshot {
+            active: 0,
+            idle: 0,
+            waiting: 0,
+            acquire_total: 0,
+            acquire_errors: 0,
+        };
+        // 无请求时命中率默认为 1.0
+        assert_eq!(snapshot.hit_rate(), 1.0);
+    }
+
+    #[tokio::test]
+    async fn test_record_acquire_failures() {
+        let metrics = PoolMetrics::new();
+
+        metrics.record_acquire(false).await;
+        metrics.record_acquire(false).await;
+
+        let snapshot = metrics.snapshot().await;
+        assert_eq!(snapshot.acquire_total, 2);
+        assert_eq!(snapshot.acquire_errors, 2);
+    }
+
+    #[tokio::test]
+    async fn test_memory_pool_is_healthy() {
+        let config = PoolConfig::test();
+        let manager = SqlitePoolManager::memory(config).await;
+
+        assert!(manager.is_ok());
+        if let Ok(m) = manager {
+            assert!(m.is_healthy().await);
+            assert_eq!(m.config().max_connections, 2);
+            m.close().await;
+        }
+    }
+
+    #[tokio::test]
+    async fn test_pool_stats_struct() {
+        let stats = PoolStats {
+            active_connections: 10,
+            idle_connections: 5,
+            waiting_tasks: 2,
+        };
+
+        assert_eq!(stats.active_connections, 10);
+        assert_eq!(stats.idle_connections, 5);
+        assert_eq!(stats.waiting_tasks, 2);
+    }
 }

@@ -10,7 +10,7 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 # ========== Web 框架 ==========
 axum = { version = "0.8", features = ["ws"] }
-tokio = { version = "1.52", features = ["full"] }
+tokio = { version = "1.52", features = ["rt", "rt-multi-thread", "sync", "macros", "time", "fs", "io-util", "net", "signal", "process"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors"] }
 
@@ -41,7 +41,9 @@ rustyline = "18"
 clap_complete = "4.6"
 
 # ========== 数据库 ==========
-sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio"] }
+# 注意: 明确禁用 mysql feature 以避免 RUSTSEC-2023-0071 (RSA Marvin Attack) 漏洞
+# 该漏洞影响 sqlx-mysql -> rsa 依赖链
+sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runtime-tokio", "derive"] }
 
 # ========== 异步流 ==========
 futures-util = "0.3"
@@ -53,6 +55,10 @@ futures-channel = "0.3"
 
 # ========== HTTP 客户端 ==========
 reqwest = { version = "0.12", features = ["json", "stream"] }
+
+# ========== 安全修复 ==========
+# 修复 RUSTSEC-2024-0421: idna 0.5.0 Punycode解码问题
+idna = "1.0"
 
 # ========== 工具 ==========
 serde = { version = "1.0", features = ["derive"] }

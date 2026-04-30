@@ -21,9 +21,9 @@ async fn test_orchestrator_memory_integration() {
     let sandbox = Sandbox::new().expect("创建沙盒失败");
     let orch = Orchestrator::new(memory.clone(), sandbox);
 
-    // 验证 memory 引用可用
+    // 验证 memory 引用可用 (使用 try_read 同步检查)
     let mem_ref = orch.memory();
-    assert!(mem_ref.read().is_ok());
+    assert!(mem_ref.try_read().is_ok());
 
     // 存储技能
     let skill = Skill {

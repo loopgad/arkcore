@@ -129,34 +129,57 @@ impl Sandbox {
         escaped
     }
 
+    /// 解析命令字符串为程序名和参数
+    fn parse_command(&self, cmd: &str) -> (String, Vec<String>) {
+        let parts: Vec<&str> = cmd.split_whitespace().collect();
+        if parts.is_empty() {
+            return (String::new(), Vec::new());
+        }
+
+        let program = parts[0].to_string();
+        let args: Vec<String> = parts[1..]
+            .iter()
+            .map(|&s| self.shell_escape(s))
+            .collect();
+
+        (program, args)
+    }
+
     /// 验证并准备命令执行
-    /// 返回 (是否安全, 错误消息)
-    fn validate_and_prepare_command(&self, cmd: &str) -> (bool, Option<String>) {
+    /// 返回 (是否安全, 错误消息, 转义后的命令字符串)
+    fn validate_and_prepare_command(&self, cmd: &str) -> (bool, Option<String>, String) {
         // 1. 安全检测
         let check_result = security_check(cmd);
         if !check_result.passed {
-            return (false, Some(format!("安全检测失败: {:?}", check_result.violations)));
+            return (false, Some(format!("安全检测失败: {:?}", check_result.violations)), String::new());
         }
 
-        // 2. 白名单检测
-        if !self.is_command_whitelisted(cmd) {
-            return (false, Some("命令不在白名单中".to_string()));
+        // 2. 解析命令
+        let (program, args) = self.parse_command(cmd);
+
+        // 3. 白名单检测 (只检查程序名)
+        if !self.is_command_whitelisted(&program) {
+            return (false, Some("命令不在白名单中".to_string()), String::new());
         }
 
-        // 3. 执行 shell 转义作为额外防护
-        let _escaped = self.shell_escape(cmd);
+        // 4. 使用转义后的参数重新构建命令
+        let escaped_cmd = if args.is_empty() {
+            program
+        } else {
+            format!("{} {}", program, args.join(" "))
+        };
 
-        (true, None)
+        (true, None, escaped_cmd)
     }
 
     /// 执行命令
     /// 实施三层安全防护：
     /// 1. 六层安全检测 (truncator)
     /// 2. 命令白名单验证
-    /// 3. Shell 转义
+    /// 3. 参数转义 (通过 shell 执行)
     pub async fn execute(&self, cmd: &str) -> anyhow::Result<ExecutionResult> {
         // 第一层: 验证并准备命令
-        let (is_safe, error_msg) = self.validate_and_prepare_command(cmd);
+        let (is_safe, error_msg, escaped_cmd) = self.validate_and_prepare_command(cmd);
         if !is_safe {
             return Ok(ExecutionResult {
                 stdout: String::new(),
@@ -167,12 +190,12 @@ impl Sandbox {
             });
         }
 
-        // 第二层: 执行命令 (使用 sh -c 经过完全验证的命令)
+        // 第二层: 通过 shell 执行转义后的命令
         let result = if cfg!(target_os = "windows") {
             timeout(
                 self.max_duration,
                 Command::new("cmd")
-                    .args(["/C", cmd])
+                    .args(["/C", &escaped_cmd])
                     .kill_on_drop(true)
                     .output(),
             )
@@ -181,7 +204,7 @@ impl Sandbox {
             timeout(
                 self.max_duration,
                 Command::new("sh")
-                    .args(["-c", cmd])
+                    .args(["-c", &escaped_cmd])
                     .kill_on_drop(true)
                     .output(),
             )
@@ -222,7 +245,7 @@ impl Sandbox {
     /// 同样实施三层安全防护
     pub async fn execute_raw(&self, cmd: &str) -> anyhow::Result<ExecutionResult> {
         // 第一层: 验证并准备命令
-        let (is_safe, error_msg) = self.validate_and_prepare_command(cmd);
+        let (is_safe, error_msg, escaped_cmd) = self.validate_and_prepare_command(cmd);
         if !is_safe {
             return Ok(ExecutionResult {
                 stdout: String::new(),
@@ -233,12 +256,12 @@ impl Sandbox {
             });
         }
 
-        // 第二层: 执行命令
+        // 第二层: 通过 shell 执行转义后的命令
         let result = if cfg!(target_os = "windows") {
             timeout(
                 self.max_duration,
                 Command::new("cmd")
-                    .args(["/C", cmd])
+                    .args(["/C", &escaped_cmd])
                     .kill_on_drop(true)
                     .output(),
             )
@@ -247,7 +270,7 @@ impl Sandbox {
             timeout(
                 self.max_duration,
                 Command::new("sh")
-                    .args(["-c", cmd])
+                    .args(["-c", &escaped_cmd])
                     .kill_on_drop(true)
                     .output(),
             )

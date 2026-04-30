@@ -271,4 +271,79 @@ mod tests {
         let status = manager.get_status().await;
         assert_eq!(status.level, HealthLevel::Unhealthy);
     }
+
+    #[tokio::test]
+    async fn test_degraded_state_pool_exhaustion() {
+        let manager = HealthManager::new();
+
+        // 设置连接池耗尽但未完全断开
+        manager.update_database_health(DatabaseHealth {
+            connected: true,
+            pool_size: 5,
+            active_connections: 5, // 全部用完
+        }).await;
+
+        let status = manager.get_status().await;
+        assert_eq!(status.level, HealthLevel::Degraded);
+    }
+
+    #[tokio::test]
+    async fn test_degraded_state_sandbox_exhaustion() {
+        let manager = HealthManager::new();
+
+        // 设置沙盒实例耗尽
+        manager.update_sandbox_health(SandboxHealth {
+            available: true,
+            active_instances: 10,
+            max_instances: 10, // 全部用完
+        }).await;
+
+        let status = manager.get_status().await;
+        assert_eq!(status.level, HealthLevel::Degraded);
+    }
+
+    #[tokio::test]
+    async fn test_update_sandbox_health() {
+        let manager = HealthManager::new();
+
+        manager.update_sandbox_health(SandboxHealth {
+            available: false,
+            active_instances: 5,
+            max_instances: 10,
+        }).await;
+
+        let status = manager.get_status().await;
+        assert!(!status.sandbox.available);
+        assert_eq!(status.level, HealthLevel::Unhealthy);
+    }
+
+    #[tokio::test]
+    async fn test_health_response_timestamp() {
+        let manager = HealthManager::new();
+        let before = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        let response = manager.get_simple_status().await;
+
+        assert!(response.timestamp >= before);
+    }
+
+    #[tokio::test]
+    async fn test_health_status_version() {
+        let manager = HealthManager::new();
+        let status = manager.get_status().await;
+
+        // 版本应该是有效的非空字符串
+        assert!(!status.version.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_app_state_creation() {
+        let health_manager = Arc::new(HealthManager::new());
+        let app_state = AppState::new(health_manager);
+
+        assert_eq!(app_state.health_manager.uptime_seconds(), 0);
+    }
 }

@@ -16,10 +16,10 @@ use aes_gcm::{
     Aes256Gcm, Nonce,
 };
 use base64::{engine::general_purpose, Engine as _};
-use pbkdf2::pbkdf2_hmac;
+use pbkdf2::pbkdf2_hmac_array;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use sha2::Sha256;
 use std::collections::HashMap;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
@@ -68,7 +68,7 @@ impl CryptoService {
         let mut salt = [0u8; 32];
         OsRng.fill_bytes(&mut salt);
 
-        let key = Self::derive_key(master_password, &salt, 100_000);
+        let key = Self::derive_key(master_password, &salt, 600_000);
 
         Self {
             current_key: KeyInfo {
@@ -76,7 +76,7 @@ impl CryptoService {
                 version: 1,
             },
             key_history: HashMap::new(),
-            kdf_iters: 100_000,
+            kdf_iters: 600_000,
         }
     }
 
@@ -85,7 +85,7 @@ impl CryptoService {
         Self {
             current_key: KeyInfo { key, version },
             key_history: HashMap::new(),
-            kdf_iters: 100_000,
+            kdf_iters: 600_000,
         }
     }
 
@@ -93,10 +93,8 @@ impl CryptoService {
     ///
     /// 使用标准的 PBKDF2 算法，迭代次数遵循 OWASP 2023 建议 (>= 600,000)
     fn derive_key(password: &str, salt: &[u8], iterations: u32) -> [u8; 32] {
-        let mut result = [0u8; 32];
-        // PBKDF2-HMAC-SHA256: pbkdf2_hmac 使用 HMAC-SHA256 作为 PRF
-        pbkdf2_hmac::<Sha256>(password.as_bytes(), salt, iterations, &mut result);
-        result
+        // PBKDF2-HMAC-SHA256: 使用 pbkdf2_hmac_array 标准实现
+        pbkdf2_hmac_array::<Sha256, 32>(password.as_bytes(), salt, iterations)
     }
 
     /// 加密数据
@@ -229,10 +227,11 @@ impl SensitiveField {
 }
 
 /// 密码哈希器 (用于密码存储)
+/// 使用标准 PBKDF2-HMAC-SHA256 算法
 pub struct PasswordHasher {
     /// 盐值
     salt: [u8; 32],
-    /// 迭代次数
+    /// 迭代次数 (OWASP 2023 建议 >= 600,000)
     iterations: u32,
 }
 
@@ -244,7 +243,7 @@ impl PasswordHasher {
 
         Self {
             salt,
-            iterations: 100_000,
+            iterations: 600_000,
         }
     }
 
@@ -252,32 +251,41 @@ impl PasswordHasher {
     pub fn with_salt(salt: [u8; 32]) -> Self {
         Self {
             salt,
-            iterations: 100_000,
+            iterations: 600_000,
         }
     }
 
-    /// 哈希密码
+    /// 哈希密码 (使用标准 PBKDF2-HMAC-SHA256)
     pub fn hash(&self, password: &str) -> String {
-        let mut result = [0u8; 64];
+        // 使用标准 PBKDF2-HMAC-SHA256 算法
+        let result = pbkdf2_hmac_array::<Sha256, 32>(password.as_bytes(), &self.salt, self.iterations);
 
-        // 第一次哈希
-        let mut current = Sha256::digest([password.as_bytes(), &self.salt].concat());
+        // 保持向后兼容格式: [derived_key(32 bytes)][salt(32 bytes)]
+        let mut output = [0u8; 64];
+        output[..32].copy_from_slice(&result);
+        output[32..].copy_from_slice(&self.salt);
 
-        // 多次迭代
-        for _ in 0..self.iterations {
-            current = Sha256::digest(current.as_slice());
-        }
-
-        result[..32].copy_from_slice(&current);
-        result[32..].copy_from_slice(&self.salt);
-
-        general_purpose::STANDARD.encode(result)
+        general_purpose::STANDARD.encode(output)
     }
 
     /// 验证密码
     pub fn verify(&self, password: &str, hash: &str) -> bool {
-        let computed = self.hash(password);
-        computed == hash
+        // 解码哈希
+        let Ok(hash_bytes) = general_purpose::STANDARD.decode(hash) else {
+            return false;
+        };
+        if hash_bytes.len() != 64 {
+            return false;
+        }
+
+        // 提取盐值 (后32字节)
+        let stored_salt: [u8; 32] = hash_bytes[32..].try_into().unwrap();
+
+        // 使用提取的盐值重新计算哈希
+        let computed = pbkdf2_hmac_array::<Sha256, 32>(password.as_bytes(), &stored_salt, self.iterations);
+
+        // 比较前32字节
+        computed == hash_bytes[..32]
     }
 
     /// 获取盐值
@@ -328,9 +336,22 @@ impl std::error::Error for CryptoError {}
 mod tests {
     use super::*;
 
+    /// 生成随机测试密码 (避免硬编码)
+    fn generate_test_password() -> String {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+        let chars: String = (0..32)
+            .map(|_| {
+                let idx = rng.gen_range(0..62);
+                b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[idx] as char
+            })
+            .collect();
+        format!("test_pwd_{}", chars)
+    }
+
     #[test]
     fn test_encrypt_decrypt() {
-        let crypto = CryptoService::new("master_password_123");
+        let crypto = CryptoService::new(&generate_test_password());
         let plaintext = "secret_api_key_12345";
 
         let encrypted = crypto.encrypt(plaintext).unwrap();
@@ -341,10 +362,10 @@ mod tests {
 
     #[test]
     fn test_wrong_password() {
-        let crypto = CryptoService::new("correct_password");
+        let crypto = CryptoService::new(&generate_test_password());
         let encrypted = crypto.encrypt("secret").unwrap();
 
-        let crypto2 = CryptoService::new("wrong_password");
+        let crypto2 = CryptoService::new(&generate_test_password());
         let result = crypto2.decrypt(&encrypted);
 
         assert!(result.is_err());
@@ -352,7 +373,7 @@ mod tests {
 
     #[test]
     fn test_key_rotation() {
-        let mut crypto = CryptoService::new("password");
+        let mut crypto = CryptoService::new(&generate_test_password());
 
         let data = crypto.encrypt("secret").unwrap();
 

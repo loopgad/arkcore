@@ -330,4 +330,129 @@ mod tests {
         assert!(!state.is_interrupt_received());
         assert!(!state.is_terminate_received());
     }
+
+    // ========== 新增测试 ==========
+
+    #[test]
+    fn test_signal_enum_variants() {
+        // 确保所有 Signal 变体都可以创建
+        let signals = [
+            Signal::Interrupt,
+            Signal::Terminate,
+            Signal::BrokenPipe,
+            Signal::Quit,
+            Signal::Suspend,
+        ];
+
+        for signal in signals {
+            let desc = signal_description(signal);
+            assert!(!desc.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_global_signal_state_mark_interrupt() {
+        let state = global_state();
+        state.reset();
+        state.mark_interrupt();
+        assert!(state.is_interrupt_received());
+        state.reset();
+        assert!(!state.is_interrupt_received());
+    }
+
+    #[test]
+    fn test_global_signal_state_mark_terminate() {
+        let state = global_state();
+        state.reset();
+        state.mark_terminate();
+        assert!(state.is_terminate_received());
+        state.reset();
+        assert!(!state.is_terminate_received());
+    }
+
+    #[test]
+    fn test_global_signal_state_new() {
+        let state = GlobalSignalState::new();
+        assert!(!state.is_interrupt_received());
+        assert!(!state.is_terminate_received());
+    }
+
+    #[test]
+    fn test_global_signal_state_default() {
+        let state = GlobalSignalState::default();
+        // 默认状态应该没有收到任何信号
+        assert!(!state.is_interrupt_received());
+        assert!(!state.is_terminate_received());
+    }
+
+    #[test]
+    fn test_signal_ordering() {
+        // 测试 Signal 可以比较
+        assert_eq!(Signal::Interrupt, Signal::Interrupt);
+        assert_ne!(Signal::Interrupt, Signal::Terminate);
+    }
+
+    #[test]
+    fn test_signal_copy() {
+        let sig = Signal::Interrupt;
+        let sig2 = sig;
+        assert_eq!(sig, sig2);
+    }
+
+    #[test]
+    fn test_signal_clone() {
+        let sig = Signal::Terminate;
+        let sig2 = sig.clone();
+        assert_eq!(sig, sig2);
+    }
+
+    #[test]
+    fn test_global_state_concurrent_access() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let state = Arc::new(GlobalSignalState::new());
+        let state_clone = state.clone();
+
+        // 在另一个线程中标记
+        let handle = thread::spawn(move || {
+            state_clone.mark_interrupt();
+        });
+
+        handle.join().expect("Thread join failed");
+
+        // 主线程应该能看到标记（使用 SeqCst ordering）
+        state.reset();
+    }
+
+    #[test]
+    fn test_to_platform_signal() {
+        // 测试信号转换函数存在且可调用
+        let sig = Signal::Interrupt;
+        let platform_sig = to_platform_signal(sig);
+        // 平台信号应该是某种整数类型
+        assert!(platform_sig >= 0);
+    }
+
+    #[test]
+    fn test_should_ignore_all_signals() {
+        // 只有 BrokenPipe 应该被忽略
+        assert!(should_ignore(Signal::BrokenPipe));
+        assert!(!should_ignore(Signal::Quit));
+        assert!(!should_ignore(Signal::Suspend));
+    }
+
+    #[test]
+    fn test_signal_debug() {
+        let sig = Signal::Interrupt;
+        let debug_str = format!("{:?}", sig);
+        assert!(debug_str.contains("Interrupt"));
+    }
+
+    #[test]
+    fn test_global_state_debug() {
+        let state = GlobalSignalState::new();
+        let debug_str = format!("{:?}", state);
+        assert!(!debug_str.is_empty());
+    }
 }
