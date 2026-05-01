@@ -256,7 +256,10 @@ mod tests {
         container.register_singleton::<String, _>(|| "hello".to_string());
 
         assert!(container.is_registered::<String>());
-        assert_eq!(container.get_lifecycle::<String>(), Some(Lifecycle::Singleton));
+        assert_eq!(
+            container.get_lifecycle::<String>(),
+            Some(Lifecycle::Singleton)
+        );
 
         let value = container.resolve::<String>();
         assert!(value.is_some());
@@ -299,7 +302,10 @@ mod tests {
         assert!(second.is_some());
         assert_eq!(first.as_ref().unwrap(), second.as_ref().unwrap());
         // 但它们是不同的实例
-        assert_ne!(Arc::as_ptr(&first.unwrap()) as *const u32, Arc::as_ptr(&second.unwrap()) as *const u32);
+        assert_ne!(
+            Arc::as_ptr(&first.unwrap()) as *const u32,
+            Arc::as_ptr(&second.unwrap()) as *const u32
+        );
     }
 
     #[test]

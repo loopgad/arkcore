@@ -161,8 +161,8 @@ pub mod unix_signal {
 
     /// 异步等待终止信号
     pub async fn wait_for_terminate() -> anyhow::Result<()> {
-        let mut terminate = signal(SignalKind::terminate())
-            .context("Failed to create terminate signal handler")?;
+        let mut terminate =
+            signal(SignalKind::terminate()).context("Failed to create terminate signal handler")?;
 
         terminate.recv().await;
         Ok(())
@@ -291,8 +291,8 @@ pub fn to_platform_signal(signal: Signal) -> libc::c_int {
 #[cfg(windows)]
 pub fn to_platform_signal(signal: Signal) -> u32 {
     match signal {
-        Signal::Interrupt => 0,  // CTRL_C_EVENT
-        Signal::Terminate => 1,  // CTRL_BREAK_EVENT
+        Signal::Interrupt => 0, // CTRL_C_EVENT
+        Signal::Terminate => 1, // CTRL_BREAK_EVENT
         Signal::BrokenPipe => 0,
         Signal::Quit => 1,
         Signal::Suspend => 1,

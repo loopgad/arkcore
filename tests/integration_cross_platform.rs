@@ -10,14 +10,10 @@
 //! - TTY 适配
 
 use arkcore::platform::{
-    commands::{
-        translate_command, shell_name, shell_args, command_separator, path_separator,
-    },
-    paths::{
-        config_dir, data_dir, cache_dir, temp_dir, home_dir,
-    },
-    signals::{Signal, GlobalSignalState},
-    tty::{TtyAdapter, supports_color, supports_true_color, is_tty},
+    commands::{command_separator, path_separator, shell_args, shell_name, translate_command},
+    paths::{cache_dir, config_dir, data_dir, home_dir, temp_dir},
+    signals::{GlobalSignalState, Signal},
+    tty::{is_tty, supports_color, supports_true_color, TtyAdapter},
 };
 
 /// 测试平台路径抽象

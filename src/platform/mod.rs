@@ -9,19 +9,19 @@ pub mod tty;
 
 // 重新导出常用类型
 pub use commands::{
-    translate_command, shell_name, shell_args, command_separator, path_separator,
-    CommandProvider, CommandTranslation, CustomCommandMappings, CurrentPlatformCommands,
-    WindowsCommands, UnixCommands,
+    command_separator, path_separator, shell_args, shell_name, translate_command, CommandProvider,
+    CommandTranslation, CurrentPlatformCommands, CustomCommandMappings, UnixCommands,
+    WindowsCommands,
 };
 pub use paths::{
-    config_dir, data_dir, cache_dir, temp_dir, home_dir, PlatformPaths, CurrentPlatformPaths,
-    WindowsPaths, UnixPaths,
+    cache_dir, config_dir, data_dir, home_dir, temp_dir, CurrentPlatformPaths, PlatformPaths,
+    UnixPaths, WindowsPaths,
 };
 pub use signals::{
-    Signal, SignalHandler, GlobalSignalState, signal_description, should_ignore,
-    to_platform_signal, global_state,
+    global_state, should_ignore, signal_description, to_platform_signal, GlobalSignalState, Signal,
+    SignalHandler,
 };
 pub use tty::{
-    TerminalCapabilities, AnsiColorType, AnsiColor, AnsiSequence, TtyAdapter,
-    supports_color, supports_true_color, is_tty,
+    is_tty, supports_color, supports_true_color, AnsiColor, AnsiColorType, AnsiSequence,
+    TerminalCapabilities, TtyAdapter,
 };

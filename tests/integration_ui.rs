@@ -11,10 +11,9 @@
 //! - 连接状态
 
 use arkcore::web::{
-    theme::{Theme, dark_values, light_values},
-    AgentStatus, AgentInfo, WsMessage, MetricsData,
-    ConnectionStatus, CommandOutput, OutputType,
     config::WebUiConfig,
+    theme::{dark_values, light_values, Theme},
+    AgentInfo, AgentStatus, CommandOutput, ConnectionStatus, MetricsData, OutputType, WsMessage,
 };
 
 /// 测试主题枚举
@@ -174,8 +173,7 @@ fn test_ws_message_serialization() {
     use serde_json;
 
     // Agent 状态消息
-    let agent_info = AgentInfo::new("agent-001", "Test Agent")
-        .with_status(AgentStatus::Running);
+    let agent_info = AgentInfo::new("agent-001", "Test Agent").with_status(AgentStatus::Running);
     let msg = WsMessage::AgentStatus(agent_info);
     let json = serde_json::to_string(&msg).expect("序列化失败");
     assert!(json.contains("agent_status"));
@@ -300,8 +298,7 @@ fn test_webui_config_serialization() {
 #[test]
 fn test_agent_state_from_status() {
     // AgentInfo 可以从 AgentStatus 创建
-    let agent = AgentInfo::new("test", "Test Agent")
-        .with_status(AgentStatus::Thinking);
+    let agent = AgentInfo::new("test", "Test Agent").with_status(AgentStatus::Thinking);
 
     assert_eq!(agent.status, AgentStatus::Thinking);
 }

@@ -3,11 +3,11 @@
 //! 提供可靠的重试逻辑，包括 Fixed Delay、Exponential Backoff with Jitter
 //! 支持可重试错误判断和最大重试次数配置
 
+use rand::Rng;
 use std::future::Future;
 use std::time::Duration;
 use tokio::time::sleep;
-use tracing::{warn, info, debug};
-use rand::Rng;
+use tracing::{debug, info, warn};
 
 /// 重试策略类型
 #[derive(Debug, Clone, Copy)]
@@ -120,7 +120,10 @@ pub enum RetryResult<T> {
     /// 成功
     Success(T),
     /// 重试耗尽后失败
-    RetriesExhausted { attempts: u32, last_error: Box<dyn std::fmt::Debug + Send + Sync> },
+    RetriesExhausted {
+        attempts: u32,
+        last_error: Box<dyn std::fmt::Debug + Send + Sync>,
+    },
     /// 不支持的操作
     NotRetryable,
 }
@@ -166,10 +169,7 @@ where
             match (self.operation)().await {
                 Ok(result) => {
                     if attempt > 1 {
-                        info!(
-                            attempts = attempt,
-                            "重试成功"
-                        );
+                        info!(attempts = attempt, "重试成功");
                     }
                     return RetryResult::Success(result);
                 }
@@ -187,10 +187,7 @@ where
                     last_err = Some(Box::new(e));
 
                     if attempt >= self.config.max_attempts {
-                        warn!(
-                            attempts = attempt,
-                            "重试次数耗尽"
-                        );
+                        warn!(attempts = attempt, "重试次数耗尽");
                         break;
                     }
 
@@ -294,14 +291,20 @@ mod tests {
         // 延迟应该在 100ms 到 110ms 之间
         let delay = config.calculate_delay(1);
         let delay_ms = delay.as_millis() as u64;
-        assert!((100..=110).contains(&delay_ms),
-            "Expected delay between 100-110ms, got {}ms", delay_ms);
+        assert!(
+            (100..=110).contains(&delay_ms),
+            "Expected delay between 100-110ms, got {}ms",
+            delay_ms
+        );
 
         // 第二次重试延迟 = 200ms + jitter (0-20ms)
         let delay2 = config.calculate_delay(2);
         let delay2_ms = delay2.as_millis() as u64;
-        assert!((200..=220).contains(&delay2_ms),
-            "Expected delay between 200-220ms, got {}ms", delay2_ms);
+        assert!(
+            (200..=220).contains(&delay2_ms),
+            "Expected delay between 200-220ms, got {}ms",
+            delay2_ms
+        );
     }
 
     #[tokio::test]
@@ -320,7 +323,9 @@ mod tests {
     async fn test_retry_not_retryable() {
         let config = RetryConfig::default();
         let retry = Retry::new(config, || async move {
-            Err(NetworkError::connection_refused("Connection refused".to_string()))
+            Err(NetworkError::connection_refused(
+                "Connection refused".to_string(),
+            ))
         });
         let result: RetryResult<()> = retry.execute().await;
 

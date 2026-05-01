@@ -12,22 +12,72 @@ use crate::sandbox::truncator::{security_check, truncate_output, SecurityCheckRe
 /// 这是第二层防护，即使安全检测通过也必须在此白名单中
 const ALLOWED_COMMANDS: &[&str] = &[
     // 文件查看和操作
-    "cat", "head", "tail", "less", "more", "grep", "rg", "find", "ls", "dir",
-    "wc", "sort", "uniq", "cut", "tr", "awk", "sed", "tee",
+    "cat",
+    "head",
+    "tail",
+    "less",
+    "more",
+    "grep",
+    "rg",
+    "find",
+    "ls",
+    "dir",
+    "wc",
+    "sort",
+    "uniq",
+    "cut",
+    "tr",
+    "awk",
+    "sed",
+    "tee",
     // 网络操作（只读）
-    "ping", "nslookup", "host", "dig",
+    "ping",
+    "nslookup",
+    "host",
+    "dig",
     // 系统信息
-    "uname", "hostname", "uptime", "df", "du", "free", "top", "ps",
+    "uname",
+    "hostname",
+    "uptime",
+    "df",
+    "du",
+    "free",
+    "top",
+    "ps",
     // 文本处理
-    "echo", "printf", "date", "pwd", "cd", "basename", "dirname", "realpath",
+    "echo",
+    "printf",
+    "date",
+    "pwd",
+    "cd",
+    "basename",
+    "dirname",
+    "realpath",
     // 进程管理
-    "kill", "pkill", "sleep", "wait", "timeout",
+    "kill",
+    "pkill",
+    "sleep",
+    "wait",
+    "timeout",
     // 权限检查
-    "id", "whoami", "groups", "stat",
+    "id",
+    "whoami",
+    "groups",
+    "stat",
     // 哈希校验
-    "md5sum", "sha256sum", "sha1sum", "sha512sum", "cksum",
+    "md5sum",
+    "sha256sum",
+    "sha1sum",
+    "sha512sum",
+    "cksum",
     // 其他安全操作
-    "git", "svn", "tar", "zip", "unzip", "gzip", "gunzip",
+    "git",
+    "svn",
+    "tar",
+    "zip",
+    "unzip",
+    "gzip",
+    "gunzip",
 ];
 
 /// 执行结果
@@ -55,10 +105,8 @@ pub struct Sandbox {
 impl Sandbox {
     /// 创建新的沙盒实例
     pub fn new() -> anyhow::Result<Self> {
-        let allowed_commands: HashSet<String> = ALLOWED_COMMANDS
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
+        let allowed_commands: HashSet<String> =
+            ALLOWED_COMMANDS.iter().map(|s| s.to_string()).collect();
 
         Ok(Self {
             max_duration: Duration::from_secs(30),
@@ -68,10 +116,8 @@ impl Sandbox {
 
     /// 创建带自定义超时时间的沙盒
     pub fn with_timeout(max_duration: Duration) -> Self {
-        let allowed_commands: HashSet<String> = ALLOWED_COMMANDS
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
+        let allowed_commands: HashSet<String> =
+            ALLOWED_COMMANDS.iter().map(|s| s.to_string()).collect();
 
         Self {
             max_duration,
@@ -87,11 +133,7 @@ impl Sandbox {
     /// 检查命令是否在白名单中
     fn is_command_whitelisted(&self, cmd: &str) -> bool {
         // 解析命令字符串获取第一个命令
-        let first_word = cmd
-            .split_whitespace()
-            .next()
-            .unwrap_or("")
-            .to_lowercase();
+        let first_word = cmd.split_whitespace().next().unwrap_or("").to_lowercase();
 
         // 移除可能的路径前缀（如 /bin/cat -> cat）
         let cmd_name = first_word
@@ -137,10 +179,7 @@ impl Sandbox {
         }
 
         let program = parts[0].to_string();
-        let args: Vec<String> = parts[1..]
-            .iter()
-            .map(|&s| self.shell_escape(s))
-            .collect();
+        let args: Vec<String> = parts[1..].iter().map(|&s| self.shell_escape(s)).collect();
 
         (program, args)
     }
@@ -151,7 +190,11 @@ impl Sandbox {
         // 1. 安全检测
         let check_result = security_check(cmd);
         if !check_result.passed {
-            return (false, Some(format!("安全检测失败: {:?}", check_result.violations)), String::new());
+            return (
+                false,
+                Some(format!("安全检测失败: {:?}", check_result.violations)),
+                String::new(),
+            );
         }
 
         // 2. 解析命令
@@ -294,15 +337,13 @@ impl Sandbox {
             Ok(Err(e)) => {
                 anyhow::bail!("命令执行失败: {}", e)
             }
-            Err(_) => {
-                Ok(ExecutionResult {
-                    stdout: String::new(),
-                    stderr: String::new(),
-                    exit_code: None,
-                    timed_out: true,
-                    security_violations: Vec::new(),
-                })
-            }
+            Err(_) => Ok(ExecutionResult {
+                stdout: String::new(),
+                stderr: String::new(),
+                exit_code: None,
+                timed_out: true,
+                security_violations: Vec::new(),
+            }),
         }
     }
 }
@@ -365,7 +406,10 @@ mod tests {
     async fn test_injection_pipe_blocked() {
         let sandbox = Sandbox::new().unwrap();
         // 管道注入
-        let result = sandbox.execute("echo hello | cat /etc/passwd").await.unwrap();
+        let result = sandbox
+            .execute("echo hello | cat /etc/passwd")
+            .await
+            .unwrap();
         assert!(!result.security_violations.is_empty() || !result.is_success());
     }
 
@@ -443,7 +487,10 @@ mod tests {
     #[tokio::test]
     async fn test_ld_preload_blocked() {
         let sandbox = Sandbox::new().unwrap();
-        let result = sandbox.execute("LD_PRELOAD=/malicious.so command").await.unwrap();
+        let result = sandbox
+            .execute("LD_PRELOAD=/malicious.so command")
+            .await
+            .unwrap();
         assert!(!result.security_violations.is_empty());
     }
 }

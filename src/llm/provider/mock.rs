@@ -159,8 +159,7 @@ mod tests {
 
     #[test]
     fn test_mock_provider_with_text_response() {
-        let provider = MockLlmProvider::new()
-            .with_text_response("Hello from mock!");
+        let provider = MockLlmProvider::new().with_text_response("Hello from mock!");
 
         let messages = vec![create_test_message(MessageRole::User, "hi")];
         let result = provider.stream_chat(&messages);
@@ -169,8 +168,8 @@ mod tests {
 
     #[test]
     fn test_mock_provider_with_error() {
-        let provider = MockLlmProvider::new()
-            .with_error(LlmError::ConfigError("Test error".to_string()));
+        let provider =
+            MockLlmProvider::new().with_error(LlmError::ConfigError("Test error".to_string()));
 
         let messages = vec![create_test_message(MessageRole::User, "hi")];
         let result = provider.stream_chat(&messages);
@@ -179,8 +178,7 @@ mod tests {
 
     #[test]
     fn test_mock_provider_model_name() {
-        let provider = MockLlmProvider::new()
-            .with_model("test-model-v1");
+        let provider = MockLlmProvider::new().with_model("test-model-v1");
 
         assert_eq!(provider.model_name(), "test-model-v1");
     }
@@ -211,8 +209,7 @@ mod tests {
             },
         ];
 
-        let provider = MockLlmProvider::new()
-            .with_response("specific", custom_events);
+        let provider = MockLlmProvider::new().with_response("specific", custom_events);
 
         let messages = vec![create_test_message(MessageRole::User, "specific")];
         let result = provider.stream_chat(&messages);
@@ -231,8 +228,7 @@ mod tests {
             done: true,
         }];
 
-        let provider = MockLlmProvider::new()
-            .with_response("hello", custom_events);
+        let provider = MockLlmProvider::new().with_response("hello", custom_events);
 
         let messages = vec![create_test_message(MessageRole::User, "say hello to me")];
         let result = provider.stream_chat(&messages);

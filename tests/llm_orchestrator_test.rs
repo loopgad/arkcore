@@ -63,12 +63,10 @@ impl MockLlmProvider {
     }
 
     pub fn with_text_response(self, text: &str) -> Self {
-        let events = vec![
-            StreamEvent {
-                content: text.to_string(),
-                done: true,
-            },
-        ];
+        let events = vec![StreamEvent {
+            content: text.to_string(),
+            done: true,
+        }];
         self.with_response("default", events)
     }
 
@@ -144,15 +142,12 @@ async fn test_mock_llm_provider_returns_predefined_response() {
         },
     ];
 
-    let mock = MockLlmProvider::new()
-        .with_response("分析任务", events.clone());
+    let mock = MockLlmProvider::new().with_response("分析任务", events.clone());
 
-    let messages = vec![
-        Message {
-            role: MessageRole::User,
-            content: "分析任务：完成数据处理".to_string(),
-        },
-    ];
+    let messages = vec![Message {
+        role: MessageRole::User,
+        content: "分析任务：完成数据处理".to_string(),
+    }];
 
     let result = mock.stream_chat(&messages);
     assert!(result.is_ok());
@@ -168,8 +163,7 @@ async fn test_mock_llm_provider_returns_predefined_response() {
 /// 验证 LLM Provider Trait 对象安全性和 Send + Sync
 #[tokio::test]
 async fn test_llm_provider_trait_object_safety() {
-    let mock = MockLlmProvider::new()
-        .with_text_response("Trait test");
+    let mock = MockLlmProvider::new().with_text_response("Trait test");
 
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<MockLlmProvider>();
@@ -206,10 +200,7 @@ async fn test_orchestrator_state_transitions() {
     let history = orch.history();
     assert!(history.len() >= 3, "状态历史应包含至少3个状态转换");
 
-    let state_sequence: Vec<String> = history
-        .iter()
-        .map(|s| format!("{:?}", s))
-        .collect();
+    let state_sequence: Vec<String> = history.iter().map(|s| format!("{:?}", s)).collect();
 
     // 验证包含 Planning 状态
     assert!(
@@ -236,16 +227,13 @@ async fn test_orchestrator_state_transitions() {
 async fn test_llm_orchestrator_integration() {
     // 准备 Mock LLM 响应
     let mock_response = "LLM分析结果：根据任务需求，已完成数据处理流程";
-    let mock_events = vec![
-        StreamEvent {
-            content: mock_response.to_string(),
-            done: true,
-        },
-    ];
+    let mock_events = vec![StreamEvent {
+        content: mock_response.to_string(),
+        done: true,
+    }];
 
     // 创建 Mock Provider
-    let mock = MockLlmProvider::new()
-        .with_response("任务", mock_events);
+    let mock = MockLlmProvider::new().with_response("任务", mock_events);
 
     // 验证 Mock Provider 可用 - 通过 Trait 接口
     let messages = vec![Message {
@@ -380,10 +368,14 @@ async fn test_state_machine_history_correctness() {
     assert!(matches!(&history[0], AgentState::Idle));
 
     // 验证存在 Planning 状态
-    assert!(history.iter().any(|s| matches!(s, AgentState::Planning { .. })));
+    assert!(history
+        .iter()
+        .any(|s| matches!(s, AgentState::Planning { .. })));
 
     // 验证存在 Executing 状态
-    assert!(history.iter().any(|s| matches!(s, AgentState::Executing { .. })));
+    assert!(history
+        .iter()
+        .any(|s| matches!(s, AgentState::Executing { .. })));
 }
 
 /// 验证 Orchestrator with_max_steps 构造函数

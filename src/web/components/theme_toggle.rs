@@ -39,9 +39,7 @@ impl ThemeToggle {
                 {}
             </button>
             "#,
-            label,
-            icon,
-            label_html
+            label, icon, label_html
         )
     }
 }

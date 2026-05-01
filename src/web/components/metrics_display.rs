@@ -83,10 +83,20 @@ impl MetricsDisplay {
                 </div>
             </div>
             "#,
-            cpu_class, props.metrics.cpu as i32, cpu_class, props.metrics.cpu as i32,
-            mem_class, props.metrics.memory as i32, mem_class, props.metrics.memory as i32,
-            disk_class, props.metrics.disk as i32, disk_class, props.metrics.disk as i32,
-            latency_class, props.metrics.latency_ms
+            cpu_class,
+            props.metrics.cpu as i32,
+            cpu_class,
+            props.metrics.cpu as i32,
+            mem_class,
+            props.metrics.memory as i32,
+            mem_class,
+            props.metrics.memory as i32,
+            disk_class,
+            props.metrics.disk as i32,
+            disk_class,
+            props.metrics.disk as i32,
+            latency_class,
+            props.metrics.latency_ms
         )
     }
 

@@ -8,5 +8,5 @@
 pub mod dashboard;
 pub mod settings;
 
-pub use dashboard::{Dashboard, DashboardProps, create_demo_dashboard};
+pub use dashboard::{create_demo_dashboard, Dashboard, DashboardProps};
 pub use settings::{Settings, SettingsProps};

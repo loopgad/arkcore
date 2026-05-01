@@ -172,13 +172,21 @@ impl ApiKeyService {
         // 生成密钥 ID
         let mut id_bytes = [0u8; 16];
         OsRng.fill_bytes(&mut id_bytes);
-        let key_id = format!("{:02x}{:02x}{:02x}{:02x}", id_bytes[0], id_bytes[1], id_bytes[2], id_bytes[3]);
+        let key_id = format!(
+            "{:02x}{:02x}{:02x}{:02x}",
+            id_bytes[0], id_bytes[1], id_bytes[2], id_bytes[3]
+        );
 
         let now = chrono::Utc::now();
-        let expires_at = request.expires_in_days.map(|days| now + chrono::Duration::days(days as i64));
+        let expires_at = request
+            .expires_in_days
+            .map(|days| now + chrono::Duration::days(days as i64));
 
         // 加密密钥
-        let encrypted_key = self.crypto.encrypt(&api_key).map_err(|e| ApiKeyError::CryptoError(e.to_string()))?;
+        let encrypted_key = self
+            .crypto
+            .encrypt(&api_key)
+            .map_err(|e| ApiKeyError::CryptoError(e.to_string()))?;
 
         // 创建密钥信息
         let key_info = ApiKeyInfo {
@@ -194,13 +202,17 @@ impl ApiKeyService {
 
         // 存储
         {
-            let mut keys = self.keys.write()
+            let mut keys = self
+                .keys
+                .write()
                 .map_err(|_| ApiKeyError::Internal("Key storage lock poisoned".to_string()))?;
             keys.insert(key_id.clone(), encrypted_key);
         }
 
         {
-            let mut infos = self.key_infos.write()
+            let mut infos = self
+                .key_infos
+                .write()
                 .map_err(|_| ApiKeyError::Internal("Key info lock poisoned".to_string()))?;
             infos.insert(key_id.clone(), key_info);
         }
@@ -251,11 +263,21 @@ impl ApiKeyService {
             return false;
         }
 
-        key_info.scopes.iter().any(|s| s == required_scope || s == "*")
+        key_info
+            .scopes
+            .iter()
+            .any(|s| s == required_scope || s == "*")
     }
 
     /// 记录使用
-    pub fn record_usage(&self, key_id: &str, path: &str, method: &str, result: &str, ip: Option<&str>) -> Result<(), ApiKeyError> {
+    pub fn record_usage(
+        &self,
+        key_id: &str,
+        path: &str,
+        method: &str,
+        result: &str,
+        ip: Option<&str>,
+    ) -> Result<(), ApiKeyError> {
         let record = ApiKeyUsage {
             key_id: key_id.to_string(),
             used_at: chrono::Utc::now(),
@@ -265,12 +287,16 @@ impl ApiKeyService {
             ip_address: ip.map(String::from),
         };
 
-        let mut records = self.usage_records.write()
+        let mut records = self
+            .usage_records
+            .write()
             .map_err(|_| ApiKeyError::Internal("Usage records lock poisoned".to_string()))?;
         records.push(record);
 
         // 更新最后使用时间
-        let mut infos = self.key_infos.write()
+        let mut infos = self
+            .key_infos
+            .write()
             .map_err(|_| ApiKeyError::Internal("Key info lock poisoned".to_string()))?;
         if let Some(info) = infos.get_mut(key_id) {
             info.last_used_at = Some(chrono::Utc::now());
@@ -281,9 +307,13 @@ impl ApiKeyService {
 
     /// 撤销密钥
     pub fn revoke(&self, key_id: &str) -> Result<(), ApiKeyError> {
-        let mut keys = self.keys.write()
+        let mut keys = self
+            .keys
+            .write()
             .map_err(|_| ApiKeyError::Internal("Key storage lock poisoned".to_string()))?;
-        let mut infos = self.key_infos.write()
+        let mut infos = self
+            .key_infos
+            .write()
             .map_err(|_| ApiKeyError::Internal("Key info lock poisoned".to_string()))?;
 
         keys.remove(key_id);
@@ -294,7 +324,9 @@ impl ApiKeyService {
 
     /// 禁用密钥
     pub fn disable(&self, key_id: &str) -> Result<(), ApiKeyError> {
-        let mut infos = self.key_infos.write()
+        let mut infos = self
+            .key_infos
+            .write()
             .map_err(|_| ApiKeyError::Internal("Key info lock poisoned".to_string()))?;
         if let Some(info) = infos.get_mut(key_id) {
             info.enabled = false;
@@ -306,7 +338,9 @@ impl ApiKeyService {
 
     /// 启用密钥
     pub fn enable(&self, key_id: &str) -> Result<(), ApiKeyError> {
-        let mut infos = self.key_infos.write()
+        let mut infos = self
+            .key_infos
+            .write()
             .map_err(|_| ApiKeyError::Internal("Key info lock poisoned".to_string()))?;
         if let Some(info) = infos.get_mut(key_id) {
             info.enabled = true;
@@ -318,7 +352,9 @@ impl ApiKeyService {
 
     /// 轮换密钥
     pub fn rotate(&self, key_id: &str) -> Result<ApiKeyResponse, ApiKeyError> {
-        let infos = self.key_infos.read()
+        let infos = self
+            .key_infos
+            .read()
             .map_err(|_| ApiKeyError::Internal("Key info lock poisoned".to_string()))?;
         let old_info = infos.get(key_id).ok_or(ApiKeyError::KeyNotFound)?.clone();
 
@@ -326,23 +362,31 @@ impl ApiKeyService {
         self.create(CreateApiKeyRequest {
             name: old_info.name,
             scopes: old_info.scopes,
-            expires_in_days: old_info.expires_at.map(|e| {
-                (e - chrono::Utc::now()).num_days() as u32
-            }),
+            expires_in_days: old_info
+                .expires_at
+                .map(|e| (e - chrono::Utc::now()).num_days() as u32),
             prefix: Some("ak_rotated_".to_string()),
         })
     }
 
     /// 获取所有密钥信息 (不含实际密钥)
     pub fn list_keys(&self) -> Result<Vec<ApiKeyInfo>, ApiKeyError> {
-        let infos = self.key_infos.read()
+        let infos = self
+            .key_infos
+            .read()
             .map_err(|_| ApiKeyError::Internal("Key info lock poisoned".to_string()))?;
         Ok(infos.values().cloned().collect())
     }
 
     /// 获取密钥使用记录
-    pub fn get_usage_history(&self, key_id: &str, limit: usize) -> Result<Vec<ApiKeyUsage>, ApiKeyError> {
-        let records = self.usage_records.read()
+    pub fn get_usage_history(
+        &self,
+        key_id: &str,
+        limit: usize,
+    ) -> Result<Vec<ApiKeyUsage>, ApiKeyError> {
+        let records = self
+            .usage_records
+            .read()
             .map_err(|_| ApiKeyError::Internal("Usage records lock poisoned".to_string()))?;
         Ok(records
             .iter()
@@ -398,7 +442,12 @@ impl ApiKeyMiddleware {
     }
 
     /// 认证请求
-    pub fn authenticate_request(&self, api_key: &str, path: &str, method: &str) -> ApiKeyAuthResult {
+    pub fn authenticate_request(
+        &self,
+        api_key: &str,
+        path: &str,
+        method: &str,
+    ) -> ApiKeyAuthResult {
         let result = self.service.authenticate(api_key);
 
         if !result.success {
@@ -408,12 +457,16 @@ impl ApiKeyMiddleware {
         let key_info = result.key_info.as_ref().unwrap();
 
         // 验证作用域
-        if !self.service.validate_scope(key_info, path) && !self.service.validate_scope(key_info, method) {
+        if !self.service.validate_scope(key_info, path)
+            && !self.service.validate_scope(key_info, method)
+        {
             return ApiKeyAuthResult::failure("无权访问此资源");
         }
 
         // 记录使用
-        let _ = self.service.record_usage(&key_info.key_id, path, method, "success", None);
+        let _ = self
+            .service
+            .record_usage(&key_info.key_id, path, method, "success", None);
 
         result
     }
@@ -597,7 +650,15 @@ mod tests {
             })
             .unwrap();
 
-        service.record_usage(&response.key_id, "/api/test", "GET", "success", Some("127.0.0.1")).unwrap();
+        service
+            .record_usage(
+                &response.key_id,
+                "/api/test",
+                "GET",
+                "success",
+                Some("127.0.0.1"),
+            )
+            .unwrap();
 
         let history = service.get_usage_history(&response.key_id, 10).unwrap();
         assert!(!history.is_empty());

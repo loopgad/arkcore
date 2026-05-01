@@ -239,18 +239,9 @@ impl IntoResponse for TooManyRequestsResponse {
         let mut response = Json(self).into_response();
         let headers = response.headers_mut();
 
-        headers.insert(
-            "retry-after",
-            retry_after_secs.to_string().parse().unwrap(),
-        );
-        headers.insert(
-            "x-ratelimit-limit",
-            "100".parse().unwrap(),
-        );
-        headers.insert(
-            "x-ratelimit-remaining",
-            "0".parse().unwrap(),
-        );
+        headers.insert("retry-after", retry_after_secs.to_string().parse().unwrap());
+        headers.insert("x-ratelimit-limit", "100".parse().unwrap());
+        headers.insert("x-ratelimit-remaining", "0".parse().unwrap());
 
         (StatusCode::TOO_MANY_REQUESTS, response).into_response()
     }
@@ -293,9 +284,7 @@ impl RateLimiter {
     pub async fn check(&self, dimension: &RateLimitDimension) -> RateLimitResult {
         let now = Instant::now();
         let reset_at = now + Duration::from_secs(60);
-        let reset_at_ts = reset_at
-            .duration_since(Instant::now())
-            .as_secs()
+        let reset_at_ts = reset_at.duration_since(Instant::now()).as_secs()
             + std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_secs())
@@ -393,12 +382,14 @@ impl RateLimiter {
 
     /// 快捷方法：检查用户限流
     pub async fn check_user(&self, user_id: &str) -> RateLimitResult {
-        self.check(&RateLimitDimension::User(user_id.to_string())).await
+        self.check(&RateLimitDimension::User(user_id.to_string()))
+            .await
     }
 
     /// 快捷方法：检查端点限流
     pub async fn check_endpoint(&self, endpoint: &str) -> RateLimitResult {
-        self.check(&RateLimitDimension::Endpoint(endpoint.to_string())).await
+        self.check(&RateLimitDimension::Endpoint(endpoint.to_string()))
+            .await
     }
 
     /// 获取当前状态摘要
@@ -513,10 +504,7 @@ mod tests {
         );
 
         let dim = RateLimitDimension::from_user_and_endpoint(None, "/api/test");
-        assert_eq!(
-            dim,
-            RateLimitDimension::Endpoint("/api/test".to_string())
-        );
+        assert_eq!(dim, RateLimitDimension::Endpoint("/api/test".to_string()));
     }
 
     #[tokio::test]

@@ -11,12 +11,14 @@
 //! - RBAC 权限模型
 //! - API 密钥管理
 
-use arkcore::sandbox::{security_check, Sandbox, SecurityCheckResult, truncate_output, ExecutionResult};
+use arkcore::sandbox::{
+    security_check, truncate_output, ExecutionResult, Sandbox, SecurityCheckResult,
+};
 use arkcore::services::security::{
+    apikey::ApiKeyService,
     audit::{AuditEvent, AuditEventType, AuditResult},
     crypto::CryptoService,
-    rbac::{Permission, Role, RbacService},
-    apikey::ApiKeyService,
+    rbac::{Permission, RbacService, Role},
 };
 use validator::Validate;
 
@@ -26,7 +28,10 @@ fn test_dangerous_parameter_detection() {
     // 测试 -exec 参数
     let result = security_check("find / -exec rm -rf {} \\;");
     assert!(!result.passed);
-    assert!(result.violations.iter().any(|v| v.contains("-exec") || v.contains("危险参数")));
+    assert!(result
+        .violations
+        .iter()
+        .any(|v| v.contains("-exec") || v.contains("危险参数")));
 
     // 测试 -delete 参数
     let result = security_check("find / -delete");
@@ -54,7 +59,13 @@ fn test_null_byte_injection_detection() {
 fn test_shell_operator_detection() {
     // 管道操作符
     let result = security_check("cat /etc/passwd | grep root");
-    assert!(!result.passed || !result.violations.iter().any(|v| v.contains("shell") || v.contains("operator")));
+    assert!(
+        !result.passed
+            || !result
+                .violations
+                .iter()
+                .any(|v| v.contains("shell") || v.contains("operator"))
+    );
 
     // 命令分隔符
     let result = security_check("ls; rm -rf /");
@@ -394,23 +405,23 @@ async fn test_api_request_validation() {
 fn test_sql_injection_pattern_detection() {
     // 这些同时包含命令注入特征的 SQL 注入模式应该被检测
     let command_injection_patterns = vec![
-        "'; DROP TABLE users; --",  // 包含 ;
-        "1; DELETE FROM users WHERE '1'='1",  // 包含 ;
+        "'; DROP TABLE users; --",           // 包含 ;
+        "1; DELETE FROM users WHERE '1'='1", // 包含 ;
     ];
 
     for input in command_injection_patterns {
         let result = security_check(input);
         // 包含 shell 操作符的 SQL 注入应该被检测为命令注入
-        assert!(!result.passed || !result.violations.is_empty(),
-            "命令注入型 SQL 注入未被检测: {}", input);
+        assert!(
+            !result.passed || !result.violations.is_empty(),
+            "命令注入型 SQL 注入未被检测: {}",
+            input
+        );
     }
 
     // 纯 SQL 注入模式（无 shell 操作符）不会被 security_check 检测
     // 这是设计预期，不计入安全违规
-    let pure_sql_patterns = vec![
-        "1' OR '1'='1",
-        "admin'--",
-    ];
+    let pure_sql_patterns = vec!["1' OR '1'='1", "admin'--"];
 
     for input in pure_sql_patterns {
         let result = security_check(input);

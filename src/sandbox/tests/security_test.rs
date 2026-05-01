@@ -56,10 +56,7 @@ mod dangerous_args_tests {
     fn test_replace_flag_detected() {
         let result = security_check("find . --replace foo -J bar");
         assert!(!result.passed);
-        assert!(result
-            .violations
-            .iter()
-            .any(|v| v.contains("危险参数")));
+        assert!(result.violations.iter().any(|v| v.contains("危险参数")));
     }
 
     #[test]
@@ -67,10 +64,7 @@ mod dangerous_args_tests {
         let result = security_check("find . -execdir malicious.sh \\;");
         assert!(!result.passed);
         // 违规消息格式为 "危险参数: -execdir"
-        assert!(result
-            .violations
-            .iter()
-            .any(|v| v.contains("危险参数")));
+        assert!(result.violations.iter().any(|v| v.contains("危险参数")));
     }
 
     #[test]
@@ -78,10 +72,7 @@ mod dangerous_args_tests {
         let result = security_check("find . -okdir dangerous_cmd \\;");
         assert!(!result.passed);
         // 违规消息格式为 "危险参数: -okdir"
-        assert!(result
-            .violations
-            .iter()
-            .any(|v| v.contains("危险参数")));
+        assert!(result.violations.iter().any(|v| v.contains("危险参数")));
     }
 
     #[test]
@@ -109,10 +100,7 @@ mod null_byte_tests {
     fn test_null_byte_detected() {
         let result = security_check("echo hello\0world");
         assert!(!result.passed);
-        assert!(result
-            .violations
-            .iter()
-            .any(|v| v.contains("空字节")));
+        assert!(result.violations.iter().any(|v| v.contains("空字节")));
     }
 
     #[test]
@@ -120,10 +108,7 @@ mod null_byte_tests {
         // 常见的空字节注入模式
         let result = security_check("cat /etc/passwd\0.txt");
         assert!(!result.passed);
-        assert!(result
-            .violations
-            .iter()
-            .any(|v| v.contains("空字节")));
+        assert!(result.violations.iter().any(|v| v.contains("空字节")));
     }
 
     #[test]
@@ -250,30 +235,21 @@ mod path_traversal_tests {
     fn test_parent_directory_traversal_detected() {
         let result = security_check("cat /etc/passwd../../../secret");
         assert!(!result.passed);
-        assert!(result
-            .violations
-            .iter()
-            .any(|v| v.contains("路径遍历")));
+        assert!(result.violations.iter().any(|v| v.contains("路径遍历")));
     }
 
     #[test]
     fn test_proc_path_detected() {
         let result = security_check("cat /proc/1/cmdline");
         assert!(!result.passed);
-        assert!(result
-            .violations
-            .iter()
-            .any(|v| v.contains("危险系统路径")));
+        assert!(result.violations.iter().any(|v| v.contains("危险系统路径")));
     }
 
     #[test]
     fn test_sys_path_detected() {
         let result = security_check("ls /sys/kernel");
         assert!(!result.passed);
-        assert!(result
-            .violations
-            .iter()
-            .any(|v| v.contains("危险系统路径")));
+        assert!(result.violations.iter().any(|v| v.contains("危险系统路径")));
     }
 
     #[test]
@@ -322,10 +298,7 @@ mod env_injection_tests {
     fn test_dyld_insert_detected() {
         let result = security_check("DYLD_INSERT_LIBRARIES=/malicious.dylib command");
         assert!(!result.passed);
-        assert!(result
-            .violations
-            .iter()
-            .any(|v| v.contains("DYLD_INSERT")));
+        assert!(result.violations.iter().any(|v| v.contains("DYLD_INSERT")));
     }
 
     #[test]
@@ -351,20 +324,14 @@ mod env_injection_tests {
     fn test_bash_env_detected() {
         let result = security_check("BASH_ENV=/malicious/script sh");
         assert!(!result.passed);
-        assert!(result
-            .violations
-            .iter()
-            .any(|v| v.contains("BASH_ENV")));
+        assert!(result.violations.iter().any(|v| v.contains("BASH_ENV")));
     }
 
     #[test]
     fn test_cdpath_detected() {
         let result = security_check("CDPATH=/etc ls");
         assert!(!result.passed);
-        assert!(result
-            .violations
-            .iter()
-            .any(|v| v.contains("CDPATH")));
+        assert!(result.violations.iter().any(|v| v.contains("CDPATH")));
     }
 
     #[test]

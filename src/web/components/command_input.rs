@@ -129,7 +129,11 @@ impl CommandInput {
                 </div>
             </div>
             "#,
-            if props.enabled { "" } else { "command-input-disabled" },
+            if props.enabled {
+                ""
+            } else {
+                "command-input-disabled"
+            },
             placeholder,
             enabled_attr
         )
@@ -141,19 +145,34 @@ impl CommandInput {
         for token in tokens {
             match token {
                 SyntaxToken::Command(s) => {
-                    html.push_str(&format!(r#"<span class="syntax-command">{}</span>"#, escape_html(s)));
+                    html.push_str(&format!(
+                        r#"<span class="syntax-command">{}</span>"#,
+                        escape_html(s)
+                    ));
                 }
                 SyntaxToken::Option(s) => {
-                    html.push_str(&format!(r#"<span class="syntax-option">{}</span>"#, escape_html(s)));
+                    html.push_str(&format!(
+                        r#"<span class="syntax-option">{}</span>"#,
+                        escape_html(s)
+                    ));
                 }
                 SyntaxToken::String(s) => {
-                    html.push_str(&format!(r#"<span class="syntax-string">{}</span>"#, escape_html(s)));
+                    html.push_str(&format!(
+                        r#"<span class="syntax-string">{}</span>"#,
+                        escape_html(s)
+                    ));
                 }
                 SyntaxToken::Comment(s) => {
-                    html.push_str(&format!(r#"<span class="syntax-comment">{}</span>"#, escape_html(s)));
+                    html.push_str(&format!(
+                        r#"<span class="syntax-comment">{}</span>"#,
+                        escape_html(s)
+                    ));
                 }
                 SyntaxToken::Normal(s) => {
-                    html.push_str(&format!(r#"<span class="syntax-normal">{}</span>"#, escape_html(s)));
+                    html.push_str(&format!(
+                        r#"<span class="syntax-normal">{}</span>"#,
+                        escape_html(s)
+                    ));
                 }
             }
         }

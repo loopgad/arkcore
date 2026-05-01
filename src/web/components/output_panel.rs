@@ -82,8 +82,7 @@ impl OutputPanel {
                 </div>
             </div>
             "#,
-            scroll_class,
-            outputs_str
+            scroll_class, outputs_str
         )
     }
 }

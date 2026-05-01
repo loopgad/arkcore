@@ -63,5 +63,5 @@ pub use audit::{
     generate_cis_report, generate_owasp_report, AuditConfig, AuditReport, CodeVulnerability,
     DependencyVulnerability, OwaspComplianceItem, PentestResult, SecurityAuditor, Severity,
 };
-pub use pentest::PenetrationTester;
 pub use patterns::{CodeAuditPattern, VulnerabilityPattern};
+pub use pentest::PenetrationTester;

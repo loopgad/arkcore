@@ -558,31 +558,46 @@ mod tests {
 
     #[test]
     fn test_is_retriable_error_429() {
-        let err = LlmError::ApiError { code: 429, message: "".to_string() };
+        let err = LlmError::ApiError {
+            code: 429,
+            message: "".to_string(),
+        };
         assert!(<TestLlmProvider as LLMProvider>::is_retriable_error(&err));
     }
 
     #[test]
     fn test_is_retriable_error_500() {
-        let err = LlmError::ApiError { code: 500, message: "".to_string() };
+        let err = LlmError::ApiError {
+            code: 500,
+            message: "".to_string(),
+        };
         assert!(<TestLlmProvider as LLMProvider>::is_retriable_error(&err));
     }
 
     #[test]
     fn test_is_retriable_error_502() {
-        let err = LlmError::ApiError { code: 502, message: "".to_string() };
+        let err = LlmError::ApiError {
+            code: 502,
+            message: "".to_string(),
+        };
         assert!(<TestLlmProvider as LLMProvider>::is_retriable_error(&err));
     }
 
     #[test]
     fn test_is_retriable_error_401() {
-        let err = LlmError::ApiError { code: 401, message: "".to_string() };
+        let err = LlmError::ApiError {
+            code: 401,
+            message: "".to_string(),
+        };
         assert!(!<TestLlmProvider as LLMProvider>::is_retriable_error(&err));
     }
 
     #[test]
     fn test_is_retriable_error_403() {
-        let err = LlmError::ApiError { code: 403, message: "".to_string() };
+        let err = LlmError::ApiError {
+            code: 403,
+            message: "".to_string(),
+        };
         assert!(!<TestLlmProvider as LLMProvider>::is_retriable_error(&err));
     }
 

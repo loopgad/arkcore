@@ -260,12 +260,15 @@ impl ConfigLoader {
 
         let format = Self::detect_format(&self.config_path);
         let mut config: Config = match format {
-            ConfigFormat::Toml => toml::from_str(&content)
-                .with_context(|| format!("解析 TOML 配置文件失败: {}", self.config_path.display()))?,
-            ConfigFormat::Yaml => serde_yaml::from_str(&content)
-                .with_context(|| format!("解析 YAML 配置文件失败: {}", self.config_path.display()))?,
-            ConfigFormat::Json => serde_json::from_str(&content)
-                .with_context(|| format!("解析 JSON 配置文件失败: {}", self.config_path.display()))?,
+            ConfigFormat::Toml => toml::from_str(&content).with_context(|| {
+                format!("解析 TOML 配置文件失败: {}", self.config_path.display())
+            })?,
+            ConfigFormat::Yaml => serde_yaml::from_str(&content).with_context(|| {
+                format!("解析 YAML 配置文件失败: {}", self.config_path.display())
+            })?,
+            ConfigFormat::Json => serde_json::from_str(&content).with_context(|| {
+                format!("解析 JSON 配置文件失败: {}", self.config_path.display())
+            })?,
         };
 
         // 应用环境变量覆盖
@@ -283,12 +286,15 @@ impl ConfigLoader {
 
         let format = Self::detect_format(&self.config_path);
         let content = match format {
-            ConfigFormat::Toml => toml::to_string_pretty(config)
-                .context("序列化配置为 TOML 失败")?,
-            ConfigFormat::Yaml => serde_yaml::to_string(config)
-                .context("序列化配置为 YAML 失败")?,
-            ConfigFormat::Json => serde_json::to_string_pretty(config)
-                .context("序列化配置为 JSON 失败")?,
+            ConfigFormat::Toml => {
+                toml::to_string_pretty(config).context("序列化配置为 TOML 失败")?
+            }
+            ConfigFormat::Yaml => {
+                serde_yaml::to_string(config).context("序列化配置为 YAML 失败")?
+            }
+            ConfigFormat::Json => {
+                serde_json::to_string_pretty(config).context("序列化配置为 JSON 失败")?
+            }
         };
 
         fs::write(&self.config_path, content)

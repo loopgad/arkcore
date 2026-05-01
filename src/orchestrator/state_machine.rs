@@ -31,7 +31,10 @@ impl fmt::Display for AgentState {
             AgentState::Idle => write!(f, "Idle"),
             AgentState::Planning { task } => write!(f, "Planning: {}", task),
             AgentState::Executing { step, total } => write!(f, "Executing ({}/{})", step, total),
-            AgentState::AwaitingApproval { command, risk_level } => {
+            AgentState::AwaitingApproval {
+                command,
+                risk_level,
+            } => {
                 write!(f, "AwaitingApproval: {} [{}]", command, risk_level)
             }
             AgentState::Reflecting { assessment } => write!(f, "Reflecting: {}", assessment),
@@ -154,10 +157,7 @@ mod tests {
         let mut sm = AgentStateMachine::new(3);
 
         for i in 0..5 {
-            sm.transition(AgentState::Executing {
-                step: i,
-                total: 5,
-            });
+            sm.transition(AgentState::Executing { step: i, total: 5 });
         }
 
         // 只应保留最后 3 个状态（加上 Idle 前的那个）

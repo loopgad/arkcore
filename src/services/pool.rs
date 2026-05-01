@@ -138,10 +138,7 @@ impl SqlitePoolManager {
 
     /// 检查连接是否健康
     pub async fn is_healthy(&self) -> bool {
-        sqlx::query("SELECT 1")
-            .fetch_one(&self.pool)
-            .await
-            .is_ok()
+        sqlx::query("SELECT 1").fetch_one(&self.pool).await.is_ok()
     }
 
     /// 关闭连接池

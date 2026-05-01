@@ -10,21 +10,21 @@
 //! - [`MetricsDisplay`] - 指标显示
 //! - [`ConnectionIndicator`] - 连接指示器
 
-pub mod status_bar;
 pub mod agent_card;
 pub mod command_input;
-pub mod output_panel;
-pub mod theme_toggle;
-pub mod metrics_display;
 pub mod connection_indicator;
+pub mod metrics_display;
+pub mod output_panel;
+pub mod status_bar;
+pub mod theme_toggle;
 
-pub use status_bar::{StatusBar, StatusBarProps};
 pub use agent_card::{AgentCard, AgentCardProps};
-pub use command_input::{CommandInput, CommandInputProps, SyntaxToken, highlight_syntax};
-pub use output_panel::{OutputPanel, OutputPanelProps};
-pub use theme_toggle::{ThemeToggle, ThemeToggleProps};
-pub use metrics_display::{MetricsDisplay, MetricsDisplayProps};
+pub use command_input::{highlight_syntax, CommandInput, CommandInputProps, SyntaxToken};
 pub use connection_indicator::{ConnectionIndicator, ConnectionIndicatorProps};
+pub use metrics_display::{MetricsDisplay, MetricsDisplayProps};
+pub use output_panel::{OutputPanel, OutputPanelProps};
+pub use status_bar::{StatusBar, StatusBarProps};
+pub use theme_toggle::{ThemeToggle, ThemeToggleProps};
 
 /// 组件通用的 CSS 样式
 pub mod styles {

@@ -84,13 +84,13 @@ impl AnsiColor {
         } else if index < 16 {
             // 标准前景色高亮
             match index {
-                8 => Self::new(128, 128, 128), // 亮黑
-                9 => Self::new(255, 0, 0),     // 亮红
-                10 => Self::new(0, 255, 0),    // 亮绿
-                11 => Self::new(255, 255, 0),  // 亮黄
-                12 => Self::new(0, 0, 255),    // 亮蓝
-                13 => Self::new(255, 0, 255),  // 亮品红
-                14 => Self::new(0, 255, 255),  // 亮青
+                8 => Self::new(128, 128, 128),  // 亮黑
+                9 => Self::new(255, 0, 0),      // 亮红
+                10 => Self::new(0, 255, 0),     // 亮绿
+                11 => Self::new(255, 255, 0),   // 亮黄
+                12 => Self::new(0, 0, 255),     // 亮蓝
+                13 => Self::new(255, 0, 255),   // 亮品红
+                14 => Self::new(0, 255, 255),   // 亮青
                 15 => Self::new(255, 255, 255), // 亮白
                 _ => Self::new(255, 255, 255),
             }
@@ -263,9 +263,8 @@ impl TtyAdapter {
         #[cfg(windows)]
         {
             // Windows: 检查代码页
-            caps.supports_utf8 = unsafe {
-                windows_sys::Win32::System::Console::GetConsoleOutputCP() == 65001
-            };
+            caps.supports_utf8 =
+                unsafe { windows_sys::Win32::System::Console::GetConsoleOutputCP() == 65001 };
         }
         #[cfg(unix)]
         {
@@ -276,10 +275,9 @@ impl TtyAdapter {
         caps.supports_true_color = Self::detect_true_color_support();
 
         // 检查 256 色
-        caps.supports_256_colors =
-            std::env::var("COLORTERM")
-                .map(|v| v == "truecolor" || v == "24bit")
-                .unwrap_or(false);
+        caps.supports_256_colors = std::env::var("COLORTERM")
+            .map(|v| v == "truecolor" || v == "24bit")
+            .unwrap_or(false);
 
         // 检查超链接
         caps.supports_hyperlinks = std::env::var("TERM_PROGRAM")
@@ -347,10 +345,10 @@ impl TtyAdapter {
         }
         #[cfg(windows)]
         {
-            use windows_sys::Win32::System::Console::GetConsoleScreenBufferInfo;
-            use windows_sys::Win32::System::Console::CONSOLE_SCREEN_BUFFER_INFO;
             use windows_sys::Win32::Foundation::HANDLE;
+            use windows_sys::Win32::System::Console::GetConsoleScreenBufferInfo;
             use windows_sys::Win32::System::Console::GetStdHandle;
+            use windows_sys::Win32::System::Console::CONSOLE_SCREEN_BUFFER_INFO;
             use windows_sys::Win32::System::Console::STD_OUTPUT_HANDLE;
 
             unsafe {
@@ -371,10 +369,10 @@ impl TtyAdapter {
     /// 启用 Windows 虚拟终端序列
     #[cfg(windows)]
     pub fn enable_virtual_terminal() -> anyhow::Result<()> {
+        use windows_sys::Win32::Foundation::HANDLE;
         use windows_sys::Win32::System::Console::{
             GetConsoleMode, SetConsoleMode, ENABLE_VIRTUAL_TERMINAL_PROCESSING,
         };
-        use windows_sys::Win32::Foundation::HANDLE;
         use windows_sys::Win32::System::Console::{GetStdHandle, STD_OUTPUT_HANDLE};
 
         unsafe {
@@ -461,7 +459,9 @@ pub fn is_tty() -> bool {
     #[cfg(windows)]
     {
         use windows_sys::Win32::Foundation::HANDLE;
-        use windows_sys::Win32::System::Console::{GetConsoleMode, GetStdHandle, STD_OUTPUT_HANDLE};
+        use windows_sys::Win32::System::Console::{
+            GetConsoleMode, GetStdHandle, STD_OUTPUT_HANDLE,
+        };
         unsafe {
             let handle: HANDLE = GetStdHandle(STD_OUTPUT_HANDLE);
             let mut mode: u32 = 0;

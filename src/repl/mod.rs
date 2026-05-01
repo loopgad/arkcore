@@ -2,8 +2,8 @@
 //!
 //! 基于 rustyline 18 实现的交互式命令行界面
 
-use rustyline::{Result, Editor};
 use rustyline::history::{FileHistory, History};
+use rustyline::{Editor, Result};
 use tracing::info;
 
 pub struct Repl {
@@ -129,7 +129,10 @@ mod tests {
     fn test_parse_command_trims_whitespace() {
         assert_eq!(Repl::parse_command("  hello  "), "hello");
         assert_eq!(Repl::parse_command("\t\tworld\t\t"), "world");
-        assert_eq!(Repl::parse_command("  cmd with spaces  "), "cmd with spaces");
+        assert_eq!(
+            Repl::parse_command("  cmd with spaces  "),
+            "cmd with spaces"
+        );
     }
 
     #[test]

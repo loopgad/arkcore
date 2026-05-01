@@ -218,9 +218,7 @@ impl ByteBufferPool {
 
         match buffer {
             Some(b) => b,
-            None => {
-                PooledByteBuffer::new(self.capacity)
-            }
+            None => PooledByteBuffer::new(self.capacity),
         }
     }
 

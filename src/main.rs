@@ -8,21 +8,23 @@
 //! - `config` - 配置管理
 
 use anyhow::Result;
-use clap::Parser;
 use arkcore::cli::Cli;
-use arkcore::repl::Repl;
-use arkcore::server::{Server, ServerConfig};
 use arkcore::memory::SkillMemory;
-use arkcore::sandbox::Sandbox;
 use arkcore::orchestrator::Orchestrator;
+use arkcore::repl::Repl;
+use arkcore::sandbox::Sandbox;
+use arkcore::server::{Server, ServerConfig};
+use clap::Parser;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() -> Result<()> {
     // 初始化日志
     tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| "arkcore=info".into()))
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "arkcore=info".into()),
+        )
         .with(tracing_subscriber::fmt::layer())
         .init();
 

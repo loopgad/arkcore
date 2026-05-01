@@ -138,9 +138,7 @@ impl VulnerabilityPattern for PathTraversalPattern {
     }
 
     fn matches(&self, line: &str) -> bool {
-        line.contains("Path::new(")
-            || line.contains("PathBuf::from(")
-            || line.contains(".join(")
+        line.contains("Path::new(") || line.contains("PathBuf::from(") || line.contains(".join(")
     }
 }
 
@@ -479,9 +477,7 @@ impl VulnerabilityPattern for InformationDisclosurePattern {
 
     fn matches(&self, line: &str) -> bool {
         let lower = line.to_lowercase();
-        (lower.contains("eprintln!")
-            || lower.contains("println!")
-            || lower.contains("log::"))
+        (lower.contains("eprintln!") || lower.contains("println!") || lower.contains("log::"))
             && (lower.contains("password")
                 || lower.contains("secret")
                 || lower.contains("token")
@@ -602,7 +598,8 @@ mod tests {
     #[test]
     fn test_sql_injection_detection() {
         let pattern = SqlInjectionPattern;
-        assert!(pattern.matches(r#"let query = format!("SELECT * FROM users WHERE id = {}", user_id);"#));
+        assert!(pattern
+            .matches(r#"let query = format!("SELECT * FROM users WHERE id = {}", user_id);"#));
         assert!(!pattern.matches(r#"let safe = format!("Hello {}!", name);"#));
     }
 

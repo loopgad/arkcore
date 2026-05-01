@@ -4,19 +4,21 @@
 
 /// 全局样式
 pub mod global {
-    use super::super::theme::{dark_values, light_values};
     use super::super::components::styles as component_styles;
     use super::super::components::{
-        status_bar, agent_card, command_input, output_panel,
-        theme_toggle, metrics_display, connection_indicator,
+        agent_card, command_input, connection_indicator, metrics_display, output_panel, status_bar,
+        theme_toggle,
     };
     use super::super::pages::{dashboard, settings};
+    use super::super::theme::{dark_values, light_values};
 
     /// 获取完整的全局 CSS
     pub fn get_css(theme: super::super::theme::Theme) -> String {
         let theme_css = match theme {
             super::super::theme::Theme::Dark => dark_values::get_css(),
-            super::super::theme::Theme::Light | super::super::theme::Theme::System => light_values::get_css(),
+            super::super::theme::Theme::Light | super::super::theme::Theme::System => {
+                light_values::get_css()
+            }
         };
 
         format!(
@@ -239,7 +241,6 @@ pub mod animations {
         }
     }
     "#;
-
 }
 
 #[cfg(test)]

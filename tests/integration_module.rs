@@ -93,7 +93,9 @@ async fn test_orchestrator_state_history() {
     let orch = create_test_orchestrator().await;
 
     // 执行任务触发状态转换
-    orch.run_task("Test task with history").await.expect("任务执行失败");
+    orch.run_task("Test task with history")
+        .await
+        .expect("任务执行失败");
 
     // 验证历史记录
     let history = orch.history();
@@ -101,7 +103,11 @@ async fn test_orchestrator_state_history() {
 
     // 验证最终状态是 Completed
     let final_state = orch.current_state();
-    assert!(matches!(final_state, AgentState::Completed { .. }), "最终状态应该是 Completed，实际是 {:?}", final_state);
+    assert!(
+        matches!(final_state, AgentState::Completed { .. }),
+        "最终状态应该是 Completed，实际是 {:?}",
+        final_state
+    );
 }
 
 /// 测试健康检查模块
@@ -162,7 +168,10 @@ async fn test_memory_fts_integration() {
 
     // 测试全文搜索
     let results = memory.search("programming", 10).await.expect("搜索失败");
-    assert!(!results.is_empty(), "应该至少找到一个匹配 'programming' 的技能");
+    assert!(
+        !results.is_empty(),
+        "应该至少找到一个匹配 'programming' 的技能"
+    );
 
     // 测试关键词搜索
     let rust_results = memory.search("rust", 10).await.expect("搜索失败");

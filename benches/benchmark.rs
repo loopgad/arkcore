@@ -110,7 +110,11 @@ mod memory_bench {
                 let manager = CacheManager::new(config);
                 for i in 0..1000 {
                     let key = LlmCacheKey::new("gpt-4", &format!("Batch prompt {}", i));
-                    manager.set_llm_response(key, format!("Batch response {}", i), "gpt-4".to_string());
+                    manager.set_llm_response(
+                        key,
+                        format!("Batch response {}", i),
+                        "gpt-4".to_string(),
+                    );
                 }
             });
         });
@@ -141,15 +145,16 @@ mod memory_bench {
 
         c.bench_function("moka_cache_insert", |b| {
             b.iter(|| {
-                cache.insert(black_box(format!("key_{}", 1)), black_box("value".to_string()));
+                cache.insert(
+                    black_box(format!("key_{}", 1)),
+                    black_box("value".to_string()),
+                );
             });
         });
 
         c.bench_function("moka_cache_insert_1k", |b| {
             b.iter(|| {
-                let cache: Cache<String, String> = Cache::builder()
-                    .max_capacity(10_000)
-                    .build();
+                let cache: Cache<String, String> = Cache::builder().max_capacity(10_000).build();
                 for i in 0..1000 {
                     cache.insert(format!("key_{}", i), format!("value_{}", i));
                 }
@@ -157,9 +162,7 @@ mod memory_bench {
         });
 
         c.bench_function("moka_cache_read_hit", |b| {
-            let cache: Cache<String, String> = Cache::builder()
-                .max_capacity(10_000)
-                .build();
+            let cache: Cache<String, String> = Cache::builder().max_capacity(10_000).build();
             cache.insert("fixed_key".to_string(), "fixed_value".to_string());
 
             b.iter(|| {
@@ -324,9 +327,7 @@ mod latency_bench {
         c.bench_function("latency_spawn_task", |b| {
             b.iter(|| {
                 rt.block_on(async {
-                    let handle = tokio::spawn(async {
-                        black_box(42u64)
-                    });
+                    let handle = tokio::spawn(async { black_box(42u64) });
                     handle.await.unwrap();
                 });
             });
@@ -336,11 +337,7 @@ mod latency_bench {
             b.iter(|| {
                 rt.block_on(async {
                     let handles: Vec<_> = (0..1000)
-                        .map(|i| {
-                            tokio::spawn(async move {
-                                black_box(i)
-                            })
-                        })
+                        .map(|i| tokio::spawn(async move { black_box(i) }))
                         .collect();
 
                     for handle in handles {
@@ -353,9 +350,7 @@ mod latency_bench {
         c.bench_function("latency_join_all", |b| {
             b.iter(|| {
                 rt.block_on(async {
-                    let results: Vec<_> = (0..1000)
-                        .map(|i| async move { black_box(i) })
-                        .collect();
+                    let results: Vec<_> = (0..1000).map(|i| async move { black_box(i) }).collect();
                     futures_util::future::join_all(results).await;
                 });
             });
@@ -614,12 +609,14 @@ mod concurrency_bench {
 // ============================================================================
 
 fn bench_t8_1_framework(c: &mut Criterion) {
-    c.benchmark_group("t8_1_framework").throughput(Throughput::Elements(1));
+    c.benchmark_group("t8_1_framework")
+        .throughput(Throughput::Elements(1));
     bench_framework(c);
 }
 
 fn bench_t8_2_memory(c: &mut Criterion) {
-    c.benchmark_group("t8_2_memory").throughput(Throughput::Elements(1));
+    c.benchmark_group("t8_2_memory")
+        .throughput(Throughput::Elements(1));
     memory_bench::bench_cache_insert(c);
     memory_bench::bench_cache_read(c);
     memory_bench::bench_cache_batch(c);
@@ -629,7 +626,8 @@ fn bench_t8_2_memory(c: &mut Criterion) {
 }
 
 fn bench_t8_3_latency(c: &mut Criterion) {
-    c.benchmark_group("t8_3_latency").throughput(Throughput::Elements(1));
+    c.benchmark_group("t8_3_latency")
+        .throughput(Throughput::Elements(1));
     latency_bench::bench_cache_latency(c);
     latency_bench::bench_lock_latency(c);
     latency_bench::bench_async_task_latency(c);
@@ -637,7 +635,8 @@ fn bench_t8_3_latency(c: &mut Criterion) {
 }
 
 fn bench_t8_4_concurrency(c: &mut Criterion) {
-    c.benchmark_group("t8_4_concurrency").throughput(Throughput::Elements(1));
+    c.benchmark_group("t8_4_concurrency")
+        .throughput(Throughput::Elements(1));
     concurrency_bench::bench_concurrent_cache(c);
     concurrency_bench::bench_concurrent_pool(c);
     concurrency_bench::bench_concurrent_lock(c);

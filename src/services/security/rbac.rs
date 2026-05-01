@@ -120,11 +120,7 @@ pub fn get_default_permissions(role: Role) -> Vec<Permission> {
             Permission::Execute,
             Permission::Admin,
         ],
-        Role::Operator => vec![
-            Permission::Read,
-            Permission::Write,
-            Permission::Execute,
-        ],
+        Role::Operator => vec![Permission::Read, Permission::Write, Permission::Execute],
         Role::User => vec![Permission::Read, Permission::Write],
         Role::Guest => vec![Permission::Read],
     }
@@ -285,10 +281,7 @@ impl RbacService {
         if let Some(existing) = roles.get_mut(user_id) {
             existing.role = role;
         } else {
-            roles.insert(
-                user_id.to_string(),
-                UserRole::new(user_id, user_id, role),
-            );
+            roles.insert(user_id.to_string(), UserRole::new(user_id, user_id, role));
         }
 
         Ok(())
@@ -326,7 +319,10 @@ impl RbacService {
         let rules = self.rules.read().unwrap();
         let required_permission = rules
             .iter()
-            .find(|r| r.resource_action.resource_type == resource_type && r.resource_action.action == action)
+            .find(|r| {
+                r.resource_action.resource_type == resource_type
+                    && r.resource_action.action == action
+            })
             .map(|r| r.required_permission);
 
         // 如果没有规则, 默认拒绝 (安全默认值)
@@ -374,7 +370,12 @@ impl RbacService {
             }
         }
 
-        if let Some(roles) = self.user_roles.read().ok().and_then(|r| r.get(user_id).cloned()) {
+        if let Some(roles) = self
+            .user_roles
+            .read()
+            .ok()
+            .and_then(|r| r.get(user_id).cloned())
+        {
             PermissionCheckResult::denied(
                 format!("用户 {} 没有满足要求的权限", roles.username),
                 None,

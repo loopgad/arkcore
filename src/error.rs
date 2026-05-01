@@ -80,7 +80,10 @@ impl Error {
     }
 
     /// 带违规详情创建安全错误
-    pub fn security_with_violation(reason: impl Into<String>, violation: impl Into<String>) -> Self {
+    pub fn security_with_violation(
+        reason: impl Into<String>,
+        violation: impl Into<String>,
+    ) -> Self {
         Self::Security {
             reason: reason.into(),
             violation: Some(violation.into()),

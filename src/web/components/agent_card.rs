@@ -48,7 +48,11 @@ impl AgentCard {
     pub fn render(props: &AgentCardProps) -> String {
         let status_icon = status_icon(props.agent.status);
         let status_class = status_class(props.agent.status);
-        let selected_class = if props.selected { "agent-card-selected" } else { "" };
+        let selected_class = if props.selected {
+            "agent-card-selected"
+        } else {
+            ""
+        };
 
         format!(
             r#"
@@ -90,7 +94,11 @@ impl AgentCard {
             props.agent.id,
             status_class,
             status_icon,
-            props.agent.current_task.as_deref().unwrap_or("No active task"),
+            props
+                .agent
+                .current_task
+                .as_deref()
+                .unwrap_or("No active task"),
             props.agent.cpu_usage as i32,
             props.agent.cpu_usage,
             props.agent.memory_usage as i32,

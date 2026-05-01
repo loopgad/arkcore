@@ -30,6 +30,6 @@ pub use config::{
     SecurityConfig,
 };
 pub use traits::{
-    Authenticator, Executor, ExecutionResult, LLMProvider, LlmError, Message, MessageRole,
+    Authenticator, ExecutionResult, Executor, LLMProvider, LlmError, Message, MessageRole,
     SecurityCheckResult, Storage, StreamEvent,
 };

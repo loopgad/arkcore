@@ -59,11 +59,7 @@ impl Default for TimeoutConfig {
 
 impl TimeoutConfig {
     /// 创建自定义超时配置
-    pub fn new(
-        llm_call: Duration,
-        database: Duration,
-        command_execution: Duration,
-    ) -> Self {
+    pub fn new(llm_call: Duration, database: Duration, command_execution: Duration) -> Self {
         Self {
             llm_call,
             database,
@@ -173,7 +169,11 @@ impl TimeoutExecutor {
     }
 
     /// 执行带 LLM 超时的操作
-    pub async fn execute_llm<F, T>(&self, operation: &'static str, future: F) -> Result<T, TimeoutError>
+    pub async fn execute_llm<F, T>(
+        &self,
+        operation: &'static str,
+        future: F,
+    ) -> Result<T, TimeoutError>
     where
         F: Future<Output = T>,
     {
@@ -181,7 +181,11 @@ impl TimeoutExecutor {
     }
 
     /// 执行带数据库超时的操作
-    pub async fn execute_database<F, T>(&self, operation: &'static str, future: F) -> Result<T, TimeoutError>
+    pub async fn execute_database<F, T>(
+        &self,
+        operation: &'static str,
+        future: F,
+    ) -> Result<T, TimeoutError>
     where
         F: Future<Output = T>,
     {
@@ -189,7 +193,11 @@ impl TimeoutExecutor {
     }
 
     /// 执行带命令执行超时的操作
-    pub async fn execute_command<F, T>(&self, operation: &'static str, future: F) -> Result<T, TimeoutError>
+    pub async fn execute_command<F, T>(
+        &self,
+        operation: &'static str,
+        future: F,
+    ) -> Result<T, TimeoutError>
     where
         F: Future<Output = T>,
     {
@@ -275,24 +283,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_timeout_executor_success() {
-        let result = TimeoutExecutor::execute(
-            "test",
-            Duration::from_secs(1),
-            async { 42 }
-        ).await;
+        let result = TimeoutExecutor::execute("test", Duration::from_secs(1), async { 42 }).await;
         assert_eq!(result.unwrap(), 42);
     }
 
     #[tokio::test]
     async fn test_timeout_executor_timeout() {
-        let result = TimeoutExecutor::execute(
-            "test",
-            Duration::from_millis(10),
-            async {
-                sleep(Duration::from_secs(1)).await;
-                42
-            },
-        ).await;
+        let result = TimeoutExecutor::execute("test", Duration::from_millis(10), async {
+            sleep(Duration::from_secs(1)).await;
+            42
+        })
+        .await;
         assert!(result.is_err());
     }
 

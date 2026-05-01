@@ -2,9 +2,9 @@
 //!
 //! 基于 FTS5 的技能记忆存储与检索系统 (sqlx 异步版本)
 
-use sqlx::{SqlitePool, FromRow, sqlite::SqlitePoolOptions};
-use serde::{Deserialize, Serialize};
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use sqlx::{sqlite::SqlitePoolOptions, FromRow, SqlitePool};
 
 /// 技能数据结构
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -93,24 +93,25 @@ impl SkillMemory {
         }
 
         // 解析并规范化路径，检查是否产生遍历
-        let normalized = std::path::Path::new(path)
-            .components()
-            .fold(String::new(), |acc, comp| {
-                match comp {
-                    std::path::Component::Normal(name) => {
-                        if acc.is_empty() {
-                            name.to_string_lossy().to_string()
-                        } else {
-                            format!("{}/{}", acc, name.to_string_lossy())
+        let normalized =
+            std::path::Path::new(path)
+                .components()
+                .fold(String::new(), |acc, comp| {
+                    match comp {
+                        std::path::Component::Normal(name) => {
+                            if acc.is_empty() {
+                                name.to_string_lossy().to_string()
+                            } else {
+                                format!("{}/{}", acc, name.to_string_lossy())
+                            }
                         }
+                        std::path::Component::ParentDir => {
+                            // 检测到 .. 说明有路径遍历
+                            acc
+                        }
+                        _ => acc,
                     }
-                    std::path::Component::ParentDir => {
-                        // 检测到 .. 说明有路径遍历
-                        acc
-                    }
-                    _ => acc,
-                }
-            });
+                });
 
         // 如果规范化后的路径包含 ..，说明有遍历尝试
         if normalized.contains("..") {
@@ -234,8 +235,8 @@ impl SkillMemory {
     fn sanitize_fts_query(query: &str) -> String {
         // FTS5 特殊字符和操作符
         const FTS5_SPECIAL_CHARS: &[char] = &[
-            '(', ')', '*', ':', '^', '-', '+', '~', '"',
-            'A', 'N', 'O', // AND, NOT, OR 的首字母会被移除
+            '(', ')', '*', ':', '^', '-', '+', '~', '"', 'A', 'N',
+            'O', // AND, NOT, OR 的首字母会被移除
         ];
 
         let mut result = String::with_capacity(query.len());
@@ -301,24 +302,20 @@ impl SkillMemory {
 
     /// 更新技能访问计数
     pub async fn increment_access(&self, skill_id: &str) -> Result<()> {
-        sqlx::query(
-            "UPDATE skill_memories SET access_count = access_count + 1 WHERE id = ?1",
-        )
-        .bind(skill_id)
-        .execute(&self.pool)
-        .await?;
+        sqlx::query("UPDATE skill_memories SET access_count = access_count + 1 WHERE id = ?1")
+            .bind(skill_id)
+            .execute(&self.pool)
+            .await?;
 
         Ok(())
     }
 
     /// 更新技能成功计数
     pub async fn increment_success(&self, skill_id: &str) -> Result<()> {
-        sqlx::query(
-            "UPDATE skill_memories SET success_count = success_count + 1 WHERE id = ?1",
-        )
-        .bind(skill_id)
-        .execute(&self.pool)
-        .await?;
+        sqlx::query("UPDATE skill_memories SET success_count = success_count + 1 WHERE id = ?1")
+            .bind(skill_id)
+            .execute(&self.pool)
+            .await?;
 
         Ok(())
     }
@@ -342,12 +339,10 @@ impl SkillMemory {
 
     /// 删除技能
     pub async fn delete_skill(&self, skill_id: &str) -> Result<()> {
-        sqlx::query(
-            "DELETE FROM skill_memories WHERE id = ?1",
-        )
-        .bind(skill_id)
-        .execute(&self.pool)
-        .await?;
+        sqlx::query("DELETE FROM skill_memories WHERE id = ?1")
+            .bind(skill_id)
+            .execute(&self.pool)
+            .await?;
 
         Ok(())
     }

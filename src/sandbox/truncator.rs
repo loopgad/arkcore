@@ -4,25 +4,52 @@
 
 /// 危险参数列表 - find/-exec/-delete 等高危操作（预转换为小写）
 const DANGEROUS_ARGS: &[&str] = &[
-    "-exec", "-execdir", "-ok", "-okdir", "-delete",
-    "--to-command", "--replace", "-i", "--in-place",
-    "-rf", "-r", "--no-preserve-root", "--one-file-system",
+    "-exec",
+    "-execdir",
+    "-ok",
+    "-okdir",
+    "-delete",
+    "--to-command",
+    "--replace",
+    "-i",
+    "--in-place",
+    "-rf",
+    "-r",
+    "--no-preserve-root",
+    "--one-file-system",
 ];
 
 /// 危险环境变量列表
 const DANGEROUS_ENV_VARS: &[&str] = &[
-    "LD_PRELOAD", "LD_LIBRARY_PATH", "DYLD_INSERT_LIBRARIES",
-    "DYLD_LIBRARY_PATH", "BASH_ENV", "ENV", "CDPATH", "DYLD_INSERT_LIBRARIES",
-    "DYLD_LIBRARY_PATH", "DYLD_FRAMEWORK_PATH", "DYLD_VERSIONED_LIBRARY_PATH",
-    "DYLD_VERSIONED_FRAMEWORK_PATH", "DYLD_IMAGE_SUFFIX", "DYLD_INSERT_LIBRARIES_DYLIB",
-    "DYLD_FORCE_FLAT_NAMESPACE", "DYLD_PRINT_OPTS", "DYLD_PRINT_ENV",
-    "PATH", "HOME", "USER", "SHELL", "TERM", "LD_DEBUG", "LD_PROFILE",
+    "LD_PRELOAD",
+    "LD_LIBRARY_PATH",
+    "DYLD_INSERT_LIBRARIES",
+    "DYLD_LIBRARY_PATH",
+    "BASH_ENV",
+    "ENV",
+    "CDPATH",
+    "DYLD_INSERT_LIBRARIES",
+    "DYLD_LIBRARY_PATH",
+    "DYLD_FRAMEWORK_PATH",
+    "DYLD_VERSIONED_LIBRARY_PATH",
+    "DYLD_VERSIONED_FRAMEWORK_PATH",
+    "DYLD_IMAGE_SUFFIX",
+    "DYLD_INSERT_LIBRARIES_DYLIB",
+    "DYLD_FORCE_FLAT_NAMESPACE",
+    "DYLD_PRINT_OPTS",
+    "DYLD_PRINT_ENV",
+    "PATH",
+    "HOME",
+    "USER",
+    "SHELL",
+    "TERM",
+    "LD_DEBUG",
+    "LD_PROFILE",
 ];
 
 /// 危险 shell 内置命令
 const DANGEROUS_BUILTINS: &[&str] = &[
-    "eval", "exec", "source", "alias", "export",
-    "declare", "typeset", "local", "readonly",
+    "eval", "exec", "source", "alias", "export", "declare", "typeset", "local", "readonly",
 ];
 
 /// 最大输出大小 (1KB)

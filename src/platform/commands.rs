@@ -87,7 +87,15 @@ impl CommandProvider for WindowsCommands {
                     if p.starts_with('-') || p.starts_with('/') {
                         // 参数保持原样
                         p.to_string()
-                    } else if p.contains('\\') || p.starts_with('\\') || p.chars().next().map(|c| c.is_alphabetic() && p.len() > 1 && p.chars().nth(1) == Some(':')).unwrap_or(false) {
+                    } else if p.contains('\\')
+                        || p.starts_with('\\')
+                        || p.chars()
+                            .next()
+                            .map(|c| {
+                                c.is_alphabetic() && p.len() > 1 && p.chars().nth(1) == Some(':')
+                            })
+                            .unwrap_or(false)
+                    {
                         // Windows 路径保持原样
                         p.to_string()
                     } else if p.contains('/') {

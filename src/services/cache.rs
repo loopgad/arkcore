@@ -24,9 +24,9 @@ pub struct CacheConfig {
 impl Default for CacheConfig {
     fn default() -> Self {
         Self {
-            llm_ttl: Duration::from_secs(300),      // 5 分钟
-            search_ttl: Duration::from_secs(60),    // 1 分钟
-            config_ttl: Duration::from_secs(3600),  // 1 小时
+            llm_ttl: Duration::from_secs(300),     // 5 分钟
+            search_ttl: Duration::from_secs(60),   // 1 分钟
+            config_ttl: Duration::from_secs(3600), // 1 小时
             max_capacity: 10_000,
         }
     }

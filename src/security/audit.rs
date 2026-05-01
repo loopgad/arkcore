@@ -177,8 +177,7 @@ pub struct AuditReport {
 impl AuditReport {
     /// 生成报告摘要
     pub fn summary(&self) -> String {
-        let total_vulns = self.dependency_vulnerabilities.len()
-            + self.code_vulnerabilities.len();
+        let total_vulns = self.dependency_vulnerabilities.len() + self.code_vulnerabilities.len();
         let critical_count = self
             .dependency_vulnerabilities
             .iter()
@@ -218,7 +217,10 @@ impl AuditReport {
             self.pentest_results.len(),
             total_vulns,
             critical_count,
-            self.owasp_compliance.values().filter(|c| c.compliant).count(),
+            self.owasp_compliance
+                .values()
+                .filter(|c| c.compliant)
+                .count(),
             self.cis_compliance.len(),
             self.cis_compliance.values().filter(|c| c.compliant).count()
         )
@@ -301,7 +303,11 @@ impl AuditReport {
         if !self.pentest_results.is_empty() {
             md.push_str("## 渗透测试结果\n\n");
             for result in &self.pentest_results {
-                let status = if result.passed { "✅ PASS" } else { "❌ FAIL" };
+                let status = if result.passed {
+                    "✅ PASS"
+                } else {
+                    "❌ FAIL"
+                };
                 md.push_str(&format!("### {} - {}\n\n", status, result.test_name));
                 if let Some(vuln) = &result.vulnerability {
                     md.push_str(&format!("**漏洞**: {}\n\n", vuln));
@@ -316,7 +322,10 @@ impl AuditReport {
         md.push_str("|------|----------|------|\n");
         for (key, item) in &self.owasp_compliance {
             let status = if item.compliant { "✅" } else { "❌" };
-            md.push_str(&format!("| {} | {} | {} |\n", status, key, item.description));
+            md.push_str(&format!(
+                "| {} | {} | {} |\n",
+                status, key, item.description
+            ));
         }
         md.push('\n');
 
@@ -658,13 +667,17 @@ impl SecurityAuditor {
 
         // T9.4: OWASP/CIS 报告生成
         if self.config.generate_owasp_report {
-            report.owasp_compliance =
-                generate_owasp_report(&report.code_vulnerabilities, &report.dependency_vulnerabilities);
+            report.owasp_compliance = generate_owasp_report(
+                &report.code_vulnerabilities,
+                &report.dependency_vulnerabilities,
+            );
         }
 
         if self.config.generate_cis_report {
-            report.cis_compliance =
-                generate_cis_report(&report.code_vulnerabilities, &report.dependency_vulnerabilities);
+            report.cis_compliance = generate_cis_report(
+                &report.code_vulnerabilities,
+                &report.dependency_vulnerabilities,
+            );
         }
 
         report.duration_ms = start.elapsed().as_millis() as u64;
@@ -686,8 +699,9 @@ impl SecurityAuditor {
             vulnerabilities.push(DependencyVulnerability {
                 crate_name: "idna".to_string(),
                 version: "0.5.0".to_string(),
-                title: "idna accepts Punycode labels that do not produce any non-ASCII when decoded"
-                    .to_string(),
+                title:
+                    "idna accepts Punycode labels that do not produce any non-ASCII when decoded"
+                        .to_string(),
                 advisory_id: "RUSTSEC-2024-0421".to_string(),
                 severity: Severity::Medium,
                 solution: "Upgrade to >=1.0.0".to_string(),

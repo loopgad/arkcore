@@ -49,7 +49,10 @@ impl ConnectionIndicator {
         };
 
         let text_html = if props.show_text {
-            format!(r#"<span class="connection-text {}">{}</span>"#, status_class, text)
+            format!(
+                r#"<span class="connection-text {}">{}</span>"#,
+                status_class, text
+            )
         } else {
             String::new()
         };
@@ -69,11 +72,7 @@ impl ConnectionIndicator {
                 {}
             </div>
             "#,
-            status_class,
-            status_class,
-            icon,
-            text_html,
-            last_connected_html
+            status_class, status_class, icon, text_html, last_connected_html
         )
     }
 }

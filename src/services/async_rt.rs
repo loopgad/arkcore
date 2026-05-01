@@ -2,8 +2,8 @@
 //!
 //! 提供 tokio 运行时调优和异步最佳实践
 
-use tokio::runtime::{Builder, Runtime};
 use std::num::NonZeroUsize;
+use tokio::runtime::{Builder, Runtime};
 
 /// Tokio 运行时配置
 #[derive(Debug, Clone)]
@@ -93,8 +93,8 @@ impl TokioRuntimeConfig {
 
 /// 异步任务工具
 pub mod task {
-    use tokio::task::JoinHandle;
     use std::future::Future;
+    use tokio::task::JoinHandle;
 
     /// 安全地 spawn 任务（捕获 panic）
     pub fn spawn_safe<F>(future: F) -> JoinHandle<F::Output>
@@ -127,8 +127,8 @@ pub mod task {
 
 /// I/O 批处理工具
 pub mod io {
-    use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
     use std::io::Result;
+    use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
     /// 批量读取辅助
     pub async fn read_batch<R, B>(reader: &mut R, buf: &mut B) -> Result<usize>

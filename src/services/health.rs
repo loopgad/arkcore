@@ -136,9 +136,7 @@ impl HealthManager {
         };
 
         // 获取协程数量（简化实现）
-        let coroutines = CoroutineHealth {
-            active_count: 0,
-        };
+        let coroutines = CoroutineHealth { active_count: 0 };
 
         // 确定健康级别
         let level = if !db_health.connected || !sandbox_health.available {
@@ -198,9 +196,7 @@ impl AppState {
 }
 
 /// 详细健康检查处理器（GET /health/detailed）
-pub async fn health_detailed_handler(
-    State(state): State<AppState>,
-) -> Response {
+pub async fn health_detailed_handler(State(state): State<AppState>) -> Response {
     let status = state.health_manager.get_status().await;
 
     let http_status = match status.level {
@@ -213,9 +209,7 @@ pub async fn health_detailed_handler(
 }
 
 /// 简单健康检查处理器（GET /health）
-pub async fn health_handler(
-    State(state): State<AppState>,
-) -> Response {
+pub async fn health_handler(State(state): State<AppState>) -> Response {
     let response = state.health_manager.get_simple_status().await;
 
     let http_status = match response.status.as_str() {
@@ -262,11 +256,13 @@ mod tests {
         let manager = HealthManager::new();
 
         // 设置数据库为断开连接
-        manager.update_database_health(DatabaseHealth {
-            connected: false,
-            pool_size: 5,
-            active_connections: 0,
-        }).await;
+        manager
+            .update_database_health(DatabaseHealth {
+                connected: false,
+                pool_size: 5,
+                active_connections: 0,
+            })
+            .await;
 
         let status = manager.get_status().await;
         assert_eq!(status.level, HealthLevel::Unhealthy);
@@ -277,11 +273,13 @@ mod tests {
         let manager = HealthManager::new();
 
         // 设置连接池耗尽但未完全断开
-        manager.update_database_health(DatabaseHealth {
-            connected: true,
-            pool_size: 5,
-            active_connections: 5, // 全部用完
-        }).await;
+        manager
+            .update_database_health(DatabaseHealth {
+                connected: true,
+                pool_size: 5,
+                active_connections: 5, // 全部用完
+            })
+            .await;
 
         let status = manager.get_status().await;
         assert_eq!(status.level, HealthLevel::Degraded);
@@ -292,11 +290,13 @@ mod tests {
         let manager = HealthManager::new();
 
         // 设置沙盒实例耗尽
-        manager.update_sandbox_health(SandboxHealth {
-            available: true,
-            active_instances: 10,
-            max_instances: 10, // 全部用完
-        }).await;
+        manager
+            .update_sandbox_health(SandboxHealth {
+                available: true,
+                active_instances: 10,
+                max_instances: 10, // 全部用完
+            })
+            .await;
 
         let status = manager.get_status().await;
         assert_eq!(status.level, HealthLevel::Degraded);
@@ -306,11 +306,13 @@ mod tests {
     async fn test_update_sandbox_health() {
         let manager = HealthManager::new();
 
-        manager.update_sandbox_health(SandboxHealth {
-            available: false,
-            active_instances: 5,
-            max_instances: 10,
-        }).await;
+        manager
+            .update_sandbox_health(SandboxHealth {
+                available: false,
+                active_instances: 5,
+                max_instances: 10,
+            })
+            .await;
 
         let status = manager.get_status().await;
         assert!(!status.sandbox.available);

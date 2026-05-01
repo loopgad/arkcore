@@ -145,18 +145,16 @@ impl UseAgentState {
         state.update_agent(
             AgentInfo::new("agent-1", "Main Agent")
                 .with_status(AgentStatus::Running)
-                .with_task("Processing user request...")
+                .with_task("Processing user request..."),
         );
 
-        state.update_agent(
-            AgentInfo::new("agent-2", "Worker Agent")
-                .with_status(AgentStatus::Idle)
-        );
+        state
+            .update_agent(AgentInfo::new("agent-2", "Worker Agent").with_status(AgentStatus::Idle));
 
         state.update_agent(
             AgentInfo::new("agent-3", "Monitor Agent")
                 .with_status(AgentStatus::Thinking)
-                .with_task("Analyzing system metrics")
+                .with_task("Analyzing system metrics"),
         );
 
         state.update_metrics(MetricsData {
@@ -194,20 +192,11 @@ mod tests {
     fn test_history() {
         let mut state = UseAgentState::with_max_history(3);
 
-        state.update_agent(
-            AgentInfo::new("test", "Agent")
-                .with_status(AgentStatus::Idle)
-        );
+        state.update_agent(AgentInfo::new("test", "Agent").with_status(AgentStatus::Idle));
 
-        state.update_agent(
-            AgentInfo::new("test", "Agent")
-                .with_status(AgentStatus::Running)
-        );
+        state.update_agent(AgentInfo::new("test", "Agent").with_status(AgentStatus::Running));
 
-        state.update_agent(
-            AgentInfo::new("test", "Agent")
-                .with_status(AgentStatus::Thinking)
-        );
+        state.update_agent(AgentInfo::new("test", "Agent").with_status(AgentStatus::Thinking));
 
         // 历史记录应该有 2 条（状态变化）
         assert!(state.history().len() <= 2);

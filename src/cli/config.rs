@@ -4,8 +4,8 @@
 //! 配置文件路径: ~/.config/arkcore/config.toml
 
 pub use crate::core::config::{
-    Config, ConfigLoader, DatabaseConfig, Environment, LlmConfig, PlatformConfig,
-    SecurityConfig, AppConfig,
+    AppConfig, Config, ConfigLoader, DatabaseConfig, Environment, LlmConfig, PlatformConfig,
+    SecurityConfig,
 };
 
 use anyhow::Result;
@@ -83,7 +83,12 @@ fn mask_url_credentials(url: &str) -> String {
                 if let Some(colon_pos) = before_at.find(':') {
                     let scheme_end = url.find("://").map(|p| p + 3).unwrap_or(0);
                     let user = &before_at[..colon_pos];
-                    return format!("{}://{}:***@{}", &url[..scheme_end], user, &url[at_pos + 1..]);
+                    return format!(
+                        "{}://{}:***@{}",
+                        &url[..scheme_end],
+                        user,
+                        &url[at_pos + 1..]
+                    );
                 }
             }
         }

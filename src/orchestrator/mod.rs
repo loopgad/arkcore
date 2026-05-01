@@ -75,7 +75,9 @@ impl Orchestrator {
         self.state_machine
             .write()
             .await
-            .transition(AgentState::Planning { task: task.to_string() });
+            .transition(AgentState::Planning {
+                task: task.to_string(),
+            });
 
         // 模拟执行阶段
         let total_steps = 3;
@@ -101,7 +103,9 @@ impl Orchestrator {
         self.state_machine
             .write()
             .await
-            .transition(AgentState::Completed { result: result.clone() });
+            .transition(AgentState::Completed {
+                result: result.clone(),
+            });
 
         Ok(result)
     }
@@ -112,7 +116,9 @@ impl Orchestrator {
         self.state_machine
             .write()
             .await
-            .transition(AgentState::Planning { task: task.to_string() });
+            .transition(AgentState::Planning {
+                task: task.to_string(),
+            });
 
         // 安全检查
         let check = self.sandbox.security_check(command);
@@ -173,7 +179,9 @@ impl Orchestrator {
         self.state_machine
             .write()
             .await
-            .transition(AgentState::Completed { result: output.clone() });
+            .transition(AgentState::Completed {
+                result: output.clone(),
+            });
 
         Ok(output)
     }
@@ -193,7 +201,6 @@ impl Orchestrator {
         &self.sandbox
     }
 }
-
 
 /// SAFETY: Orchestrator is safe to send across thread boundaries because:
 /// - All interior mutability is protected by Arc<RwLock<...>> or similar synchronization

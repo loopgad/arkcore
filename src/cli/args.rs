@@ -66,7 +66,10 @@ mod tests {
         match cli.command {
             Commands::Repl { init } => {
                 assert!(init.is_some());
-                assert_eq!(init.unwrap(), std::path::PathBuf::from("/path/to/script.rs"));
+                assert_eq!(
+                    init.unwrap(),
+                    std::path::PathBuf::from("/path/to/script.rs")
+                );
             }
             _ => panic!("Expected Repl command"),
         }

@@ -4,8 +4,14 @@
 //! 提供 Graceful Shutdown 支持
 
 use axum::{
-    extract::{ws::{WebSocket, WebSocketUpgrade}, State},
-    response::{sse::{Event, KeepAlive, Sse}, IntoResponse},
+    extract::{
+        ws::{WebSocket, WebSocketUpgrade},
+        State,
+    },
+    response::{
+        sse::{Event, KeepAlive, Sse},
+        IntoResponse,
+    },
     routing::get,
     Router,
 };
@@ -14,7 +20,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::signal;
 use tokio::sync::broadcast;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
 use crate::orchestrator::Orchestrator;
 use crate::services::{
@@ -224,26 +230,25 @@ impl Server {
 }
 
 /// 健康检查处理器
-async fn health_handler(
-    State(state): State<AppState>,
-) -> impl IntoResponse {
+async fn health_handler(State(state): State<AppState>) -> impl IntoResponse {
     use crate::services::health::health_handler as svc_health;
     svc_health(axum::extract::State(state)).await
 }
 
 /// 详细健康检查处理器
-async fn health_detailed_handler(
-    State(state): State<AppState>,
-) -> impl IntoResponse {
+async fn health_detailed_handler(State(state): State<AppState>) -> impl IntoResponse {
     use crate::services::health::health_detailed_handler as svc_health_detailed;
     svc_health_detailed(axum::extract::State(state)).await
 }
 
 /// SSE 事件流处理器
-async fn sse_handler() -> Sse<impl tokio_stream::Stream<Item = Result<Event, std::convert::Infallible>>> {
+async fn sse_handler(
+) -> Sse<impl tokio_stream::Stream<Item = Result<Event, std::convert::Infallible>>> {
     let stream = tokio_stream::iter(vec![
         Ok(Event::default().data("Connected to ArkCore")),
-        Ok(Event::default().event("status").data(r#"{"status":"ready"}"#)),
+        Ok(Event::default()
+            .event("status")
+            .data(r#"{"status":"ready"}"#)),
     ]);
 
     Sse::new(stream).keep_alive(KeepAlive::default())
@@ -385,8 +390,7 @@ mod tests {
 
     #[test]
     fn test_server_config_builder() {
-        let config = ServerConfig::new(9090)
-            .with_shutdown_timeout(Duration::from_secs(60));
+        let config = ServerConfig::new(9090).with_shutdown_timeout(Duration::from_secs(60));
 
         assert_eq!(config.port, 9090);
         assert_eq!(config.shutdown_timeout, Duration::from_secs(60));
@@ -395,8 +399,7 @@ mod tests {
     #[test]
     fn test_server_config_builder_chaining() {
         // Test that builder methods can be chained
-        let config = ServerConfig::default()
-            .with_shutdown_timeout(Duration::from_secs(45));
+        let config = ServerConfig::default().with_shutdown_timeout(Duration::from_secs(45));
 
         assert_eq!(config.port, 8080); // unchanged from default
         assert_eq!(config.shutdown_timeout, Duration::from_secs(45));

@@ -46,8 +46,16 @@ pub struct StatusBar;
 impl StatusBar {
     /// 渲染状态栏
     pub fn render(props: &StatusBarProps) -> String {
-        let connection_status = if props.connected { "connected" } else { "disconnected" };
-        let connection_class = if props.connected { "status-connected" } else { "status-disconnected" };
+        let connection_status = if props.connected {
+            "connected"
+        } else {
+            "disconnected"
+        };
+        let connection_class = if props.connected {
+            "status-connected"
+        } else {
+            "status-disconnected"
+        };
 
         format!(
             r#"

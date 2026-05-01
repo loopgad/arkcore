@@ -71,10 +71,7 @@ impl CryptoService {
         let key = Self::derive_key(master_password, &salt, 600_000);
 
         Self {
-            current_key: KeyInfo {
-                key,
-                version: 1,
-            },
+            current_key: KeyInfo { key, version: 1 },
             key_history: HashMap::new(),
             kdf_iters: 600_000,
         }
@@ -132,8 +129,8 @@ impl CryptoService {
                 .ok_or(CryptoError::UnknownKeyVersion)?
         };
 
-        let cipher = Aes256Gcm::new_from_slice(key)
-            .map_err(|e| CryptoError::KeyError(e.to_string()))?;
+        let cipher =
+            Aes256Gcm::new_from_slice(key).map_err(|e| CryptoError::KeyError(e.to_string()))?;
 
         let ciphertext = general_purpose::STANDARD
             .decode(&data.ciphertext)
@@ -148,8 +145,7 @@ impl CryptoService {
             .decrypt(nonce, ciphertext.as_ref())
             .map_err(|e| CryptoError::DecryptionError(e.to_string()))?;
 
-        String::from_utf8(plaintext)
-            .map_err(|e| CryptoError::Utf8Error(e.to_string()))
+        String::from_utf8(plaintext).map_err(|e| CryptoError::Utf8Error(e.to_string()))
     }
 
     /// 轮换密钥
@@ -193,17 +189,26 @@ pub struct SensitiveField;
 
 impl SensitiveField {
     /// 加密 API 密钥
-    pub fn encrypt_api_key(crypto: &CryptoService, api_key: &str) -> Result<EncryptedData, CryptoError> {
+    pub fn encrypt_api_key(
+        crypto: &CryptoService,
+        api_key: &str,
+    ) -> Result<EncryptedData, CryptoError> {
         crypto.encrypt(api_key)
     }
 
     /// 解密 API 密钥
-    pub fn decrypt_api_key(crypto: &CryptoService, data: &EncryptedData) -> Result<String, CryptoError> {
+    pub fn decrypt_api_key(
+        crypto: &CryptoService,
+        data: &EncryptedData,
+    ) -> Result<String, CryptoError> {
         crypto.decrypt(data)
     }
 
     /// 加密密码 (使用单独的盐值)
-    pub fn encrypt_password(crypto: &CryptoService, password: &str) -> Result<EncryptedData, CryptoError> {
+    pub fn encrypt_password(
+        crypto: &CryptoService,
+        password: &str,
+    ) -> Result<EncryptedData, CryptoError> {
         crypto.encrypt(password)
     }
 
@@ -258,7 +263,8 @@ impl PasswordHasher {
     /// 哈希密码 (使用标准 PBKDF2-HMAC-SHA256)
     pub fn hash(&self, password: &str) -> String {
         // 使用标准 PBKDF2-HMAC-SHA256 算法
-        let result = pbkdf2_hmac_array::<Sha256, 32>(password.as_bytes(), &self.salt, self.iterations);
+        let result =
+            pbkdf2_hmac_array::<Sha256, 32>(password.as_bytes(), &self.salt, self.iterations);
 
         // 保持向后兼容格式: [derived_key(32 bytes)][salt(32 bytes)]
         let mut output = [0u8; 64];
@@ -282,7 +288,8 @@ impl PasswordHasher {
         let stored_salt: [u8; 32] = hash_bytes[32..].try_into().unwrap();
 
         // 使用提取的盐值重新计算哈希
-        let computed = pbkdf2_hmac_array::<Sha256, 32>(password.as_bytes(), &stored_salt, self.iterations);
+        let computed =
+            pbkdf2_hmac_array::<Sha256, 32>(password.as_bytes(), &stored_salt, self.iterations);
 
         // 比较前32字节
         computed == hash_bytes[..32]

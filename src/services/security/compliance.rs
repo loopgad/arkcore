@@ -190,7 +190,10 @@ impl Default for SecurityComplianceReport {
             generated_at: Utc::now(),
             version: "1.0.0".to_string(),
             target_system: "ArkCore".to_string(),
-            standards: vec![ComplianceStandard::OwaspTop10, ComplianceStandard::CisBenchmarks],
+            standards: vec![
+                ComplianceStandard::OwaspTop10,
+                ComplianceStandard::CisBenchmarks,
+            ],
             vulnerability_scan: None,
             dependency_audit: None,
             security_config: None,
@@ -338,16 +341,46 @@ impl ComplianceReporter {
             .iter()
             .map(|check| {
                 let passed = match check.id.as_str() {
-                    "A01" => config.get("access_control_enabled").map(|v| v == "true").unwrap_or(false),
-                    "A02" => config.get("encryption_enabled").map(|v| v == "true").unwrap_or(false),
-                    "A03" => config.get("input_validation_enabled").map(|v| v == "true").unwrap_or(false),
-                    "A04" => config.get("secure_design_reviewed").map(|v| v == "true").unwrap_or(false),
-                    "A05" => config.get("security_hardening_applied").map(|v| v == "true").unwrap_or(false),
-                    "A06" => config.get("components_updated").map(|v| v == "true").unwrap_or(false),
-                    "A07" => config.get("auth_mechanism_strong").map(|v| v == "true").unwrap_or(false),
-                    "A08" => config.get("integrity_checks_enabled").map(|v| v == "true").unwrap_or(false),
-                    "A09" => config.get("logging_monitoring_enabled").map(|v| v == "true").unwrap_or(false),
-                    "A10" => config.get("ssrf_protection_enabled").map(|v| v == "true").unwrap_or(false),
+                    "A01" => config
+                        .get("access_control_enabled")
+                        .map(|v| v == "true")
+                        .unwrap_or(false),
+                    "A02" => config
+                        .get("encryption_enabled")
+                        .map(|v| v == "true")
+                        .unwrap_or(false),
+                    "A03" => config
+                        .get("input_validation_enabled")
+                        .map(|v| v == "true")
+                        .unwrap_or(false),
+                    "A04" => config
+                        .get("secure_design_reviewed")
+                        .map(|v| v == "true")
+                        .unwrap_or(false),
+                    "A05" => config
+                        .get("security_hardening_applied")
+                        .map(|v| v == "true")
+                        .unwrap_or(false),
+                    "A06" => config
+                        .get("components_updated")
+                        .map(|v| v == "true")
+                        .unwrap_or(false),
+                    "A07" => config
+                        .get("auth_mechanism_strong")
+                        .map(|v| v == "true")
+                        .unwrap_or(false),
+                    "A08" => config
+                        .get("integrity_checks_enabled")
+                        .map(|v| v == "true")
+                        .unwrap_or(false),
+                    "A09" => config
+                        .get("logging_monitoring_enabled")
+                        .map(|v| v == "true")
+                        .unwrap_or(false),
+                    "A10" => config
+                        .get("ssrf_protection_enabled")
+                        .map(|v| v == "true")
+                        .unwrap_or(false),
                     _ => false,
                 };
 
@@ -458,7 +491,10 @@ impl ComplianceReporter {
             generated_at: Utc::now(),
             version: "1.0.0".to_string(),
             target_system: target_system.to_string(),
-            standards: vec![ComplianceStandard::OwaspTop10, ComplianceStandard::CisBenchmarks],
+            standards: vec![
+                ComplianceStandard::OwaspTop10,
+                ComplianceStandard::CisBenchmarks,
+            ],
             vulnerability_scan: Some(vuln_report),
             dependency_audit: None,
             security_config: Some(config_report),
@@ -469,8 +505,12 @@ impl ComplianceReporter {
     }
 
     /// 生成报告 JSON
-    pub fn generate_json(&self, report: &SecurityComplianceReport) -> Result<String, ComplianceError> {
-        serde_json::to_string_pretty(report).map_err(|e| ComplianceError::SerializationError(e.to_string()))
+    pub fn generate_json(
+        &self,
+        report: &SecurityComplianceReport,
+    ) -> Result<String, ComplianceError> {
+        serde_json::to_string_pretty(report)
+            .map_err(|e| ComplianceError::SerializationError(e.to_string()))
     }
 }
 

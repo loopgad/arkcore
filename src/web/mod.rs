@@ -16,19 +16,19 @@
 
 use serde::{Deserialize, Serialize};
 
-pub mod theme;
 pub mod components;
-pub mod pages;
 pub mod hooks;
+pub mod pages;
 pub mod styles;
+pub mod theme;
 
 // Re-export commonly used types
-pub use theme::{Theme, ThemeProvider};
 pub use components::{
-    AgentCard, StatusBar, CommandInput, OutputPanel,
-    ThemeToggle, MetricsDisplay, ConnectionIndicator,
+    AgentCard, CommandInput, ConnectionIndicator, MetricsDisplay, OutputPanel, StatusBar,
+    ThemeToggle,
 };
-pub use hooks::{use_websocket, use_theme, use_agent_state};
+pub use hooks::{use_agent_state, use_theme, use_websocket};
+pub use theme::{Theme, ThemeProvider};
 
 // Web UI 配置
 pub mod config {

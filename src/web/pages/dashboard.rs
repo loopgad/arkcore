@@ -2,14 +2,12 @@
 //!
 //! 主页面，显示 Agent 状态、指标和输出。
 
-use super::super::{
-    AgentInfo, AgentStatus, CommandOutput, ConnectionStatus, MetricsData,
-    OutputType,
-};
 use super::super::components::{
-    AgentCard, CommandInput, CommandInputProps,
-    ConnectionIndicator, ConnectionIndicatorProps, MetricsDisplay,
-    OutputPanel, OutputPanelProps, StatusBar, ThemeToggle, ThemeToggleProps,
+    AgentCard, CommandInput, CommandInputProps, ConnectionIndicator, ConnectionIndicatorProps,
+    MetricsDisplay, OutputPanel, OutputPanelProps, StatusBar, ThemeToggle, ThemeToggleProps,
+};
+use super::super::{
+    AgentInfo, AgentStatus, CommandOutput, ConnectionStatus, MetricsData, OutputType,
 };
 
 /// 仪表盘页面属性
@@ -175,7 +173,13 @@ impl Dashboard {
             enabled: props.connection_status == ConnectionStatus::Connected,
             placeholder: "Enter command...",
             history: vec![],
-            completions: vec!["ls".into(), "cd".into(), "pwd".into(), "mkdir".into(), "rm".into()],
+            completions: vec![
+                "ls".into(),
+                "cd".into(),
+                "pwd".into(),
+                "mkdir".into(),
+                "rm".into(),
+            ],
         });
 
         // 渲染主题切换

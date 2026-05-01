@@ -103,8 +103,8 @@ impl UseTheme {
     /// 应用主题到 DOM（Web 环境）
     #[cfg(target_arch = "wasm32")]
     pub fn apply(&self) {
-        use web_sys::window;
         use super::super::theme::{dark_values, light_values};
+        use web_sys::window;
 
         let window = match window() {
             Some(w) => w,

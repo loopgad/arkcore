@@ -115,11 +115,7 @@ pub struct AuditEvent {
 
 impl AuditEvent {
     /// 创建新的审计事件
-    pub fn new(
-        event_type: AuditEventType,
-        action: impl Into<String>,
-        result: AuditResult,
-    ) -> Self {
+    pub fn new(event_type: AuditEventType, action: impl Into<String>, result: AuditResult) -> Self {
         let event_id = uuid_v4();
         let timestamp = Utc::now();
         let action_str = action.into();
@@ -280,8 +276,7 @@ impl AuditLogWriter {
             let json = serde_json::to_string_pretty(&self.buffer)
                 .map_err(|e| AuditError::SerializationError(e.to_string()))?;
 
-            std::fs::write(path, json)
-                .map_err(|e| AuditError::IoError(e.to_string()))?;
+            std::fs::write(path, json).map_err(|e| AuditError::IoError(e.to_string()))?;
         }
 
         self.buffer.clear();
@@ -344,7 +339,10 @@ impl AuditLogReader {
     /// 验证所有事件的校验和
     pub fn verify_all(&self) -> Result<Vec<(AuditEvent, bool)>, AuditError> {
         let events = self.read_all()?;
-        Ok(events.into_iter().map(|e| (e.clone(), e.verify_checksum())).collect())
+        Ok(events
+            .into_iter()
+            .map(|e| (e.clone(), e.verify_checksum()))
+            .collect())
     }
 }
 
@@ -369,22 +367,14 @@ pub fn log_authentication(
 }
 
 /// 便捷函数: 记录命令执行事件
-pub fn log_command_execution(
-    user_id: &str,
-    command: &str,
-    result: AuditResult,
-) -> AuditEvent {
+pub fn log_command_execution(user_id: &str, command: &str, result: AuditResult) -> AuditEvent {
     let mut details = HashMap::new();
     details.insert("command".to_string(), command.to_string());
 
-    AuditEvent::new(
-        AuditEventType::CommandExecution,
-        "execute_command",
-        result,
-    )
-    .with_user(user_id, "system")
-    .with_resource(command)
-    .with_details(details)
+    AuditEvent::new(AuditEventType::CommandExecution, "execute_command", result)
+        .with_user(user_id, "system")
+        .with_resource(command)
+        .with_details(details)
 }
 
 /// 便捷函数: 记录配置变更事件

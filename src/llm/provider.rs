@@ -4,11 +4,11 @@
 
 pub mod mock;
 
-use std::time::Duration;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
-pub use crate::core::traits::{Message, MessageRole, StreamEvent, LLMProvider as LlmProviderTrait};
+pub use crate::core::traits::{LLMProvider as LlmProviderTrait, Message, MessageRole, StreamEvent};
 // Re-export LlmError from core traits to avoid duplicate definitions
 pub use crate::core::traits::LlmError;
 
@@ -81,7 +81,10 @@ impl LlmProviderTrait for OpenAiProvider {
 
     fn stream_chat(&self, messages: &[Message]) -> Result<Vec<StreamEvent>, Self::Error> {
         Ok(vec![StreamEvent {
-            content: format!("OpenAI response to: {}", messages.last().map(|m| m.content.as_str()).unwrap_or("")),
+            content: format!(
+                "OpenAI response to: {}",
+                messages.last().map(|m| m.content.as_str()).unwrap_or("")
+            ),
             done: true,
         }])
     }
@@ -107,7 +110,10 @@ impl LlmProviderTrait for AnthropicProvider {
 
     fn stream_chat(&self, messages: &[Message]) -> Result<Vec<StreamEvent>, Self::Error> {
         Ok(vec![StreamEvent {
-            content: format!("Anthropic response to: {}", messages.last().map(|m| m.content.as_str()).unwrap_or("")),
+            content: format!(
+                "Anthropic response to: {}",
+                messages.last().map(|m| m.content.as_str()).unwrap_or("")
+            ),
             done: true,
         }])
     }
@@ -194,8 +200,7 @@ impl LlmProviderTrait for OllamaProvider {
         // 如果没有 runtime 上下文（如在 spawn_blocking 中），这会 panic
         // 因此该方法只能在 async 上下文中调用
         let messages = messages.to_vec();
-        tokio::runtime::Handle::current()
-            .block_on(self.stream_chat_async(&messages))
+        tokio::runtime::Handle::current().block_on(self.stream_chat_async(&messages))
     }
 
     fn model_name(&self) -> &str {
@@ -215,7 +220,8 @@ impl OllamaProvider {
                     MessageRole::System => "system",
                     MessageRole::User => "user",
                     MessageRole::Assistant => "assistant",
-                }.to_string(),
+                }
+                .to_string(),
                 content: m.content.clone(),
             })
             .collect();
@@ -226,7 +232,8 @@ impl OllamaProvider {
             stream: true,
         };
 
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .json(&request)
             .send()
@@ -263,7 +270,8 @@ impl OllamaProvider {
                                     return Ok(events);
                                 }
                                 // 尝试解析响应
-                                let resp: Result<OllamaResponse, _> = serde_json::from_str(data_trimmed);
+                                let resp: Result<OllamaResponse, _> =
+                                    serde_json::from_str(data_trimmed);
                                 if let Ok(resp) = resp {
                                     events.push(StreamEvent {
                                         content: resp.message.content,

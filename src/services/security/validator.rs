@@ -196,7 +196,9 @@ impl DangerPatternDetector {
 
     /// 检测 XSS
     pub fn detect_xss(&self, input: &str) -> bool {
-        self.xss_patterns.iter().any(|pattern| input.contains(pattern))
+        self.xss_patterns
+            .iter()
+            .any(|pattern| input.contains(pattern))
     }
 
     /// 检测命令注入
@@ -239,13 +241,16 @@ pub struct InputSanitizer;
 impl InputSanitizer {
     /// 移除非打印字符
     pub fn strip_non_printable(input: &str) -> String {
-        input.chars().map(|c| {
-            if c.is_control() && !c.is_whitespace() {
-                ' '
-            } else {
-                c
-            }
-        }).collect()
+        input
+            .chars()
+            .map(|c| {
+                if c.is_control() && !c.is_whitespace() {
+                    ' '
+                } else {
+                    c
+                }
+            })
+            .collect()
     }
 
     /// 移除非 ASCII 字符

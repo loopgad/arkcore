@@ -2,8 +2,8 @@
 //!
 //! 提供 LLM Provider 的 Mock 实现和单元测试
 
-use std::time::Duration;
 use std::collections::HashMap;
+use std::time::Duration;
 
 /// LLM 消息角色
 #[derive(Debug, Clone, PartialEq)]
@@ -30,10 +30,7 @@ pub struct StreamEvent {
 /// LLM Provider Trait - 定义 LLM 客户端接口
 pub trait LlmProvider: Send + Sync {
     /// 发送聊天消息并获取流式响应
-    fn stream_chat(
-        &self,
-        messages: &[Message],
-    ) -> Result<Vec<StreamEvent>, LlmError>;
+    fn stream_chat(&self, messages: &[Message]) -> Result<Vec<StreamEvent>, LlmError>;
 
     /// 获取模型名称
     fn model_name(&self) -> &str;
@@ -95,12 +92,10 @@ impl MockLlmProvider {
 
     /// 添加简单的文本响应
     pub fn with_text_response(self, text: &str) -> Self {
-        let events = vec![
-            StreamEvent {
-                content: text.to_string(),
-                done: true,
-            },
-        ];
+        let events = vec![StreamEvent {
+            content: text.to_string(),
+            done: true,
+        }];
         self.with_response("default", events)
     }
 
@@ -241,8 +236,7 @@ mod tests {
 
     #[test]
     fn test_mock_provider_pattern_matching() {
-        let mock = MockLlmProvider::new()
-            .with_text_response("Matched pattern");
+        let mock = MockLlmProvider::new().with_text_response("Matched pattern");
 
         let messages = vec![
             Message {
@@ -376,10 +370,7 @@ mod tests {
             let content = extract_json_string(trimmed, "content");
             let done = trimmed.contains("\"done\": true") || trimmed.contains("\"done\":true");
 
-            events.push(StreamEvent {
-                content,
-                done,
-            });
+            events.push(StreamEvent { content, done });
         }
 
         events
@@ -436,8 +427,7 @@ mod tests {
 
     #[test]
     fn test_timeout_error_handling() {
-        let mock = MockLlmProvider::new()
-            .with_error(LlmError::Timeout(Duration::from_secs(30)));
+        let mock = MockLlmProvider::new().with_error(LlmError::Timeout(Duration::from_secs(30)));
 
         let messages = vec![Message {
             role: MessageRole::User,
@@ -457,11 +447,10 @@ mod tests {
 
     #[test]
     fn test_api_error_handling() {
-        let mock = MockLlmProvider::new()
-            .with_error(LlmError::ApiError {
-                code: 429,
-                message: "Rate limit exceeded".to_string(),
-            });
+        let mock = MockLlmProvider::new().with_error(LlmError::ApiError {
+            code: 429,
+            message: "Rate limit exceeded".to_string(),
+        });
 
         let messages = vec![Message {
             role: MessageRole::User,
@@ -482,8 +471,8 @@ mod tests {
 
     #[test]
     fn test_config_error_handling() {
-        let mock = MockLlmProvider::new()
-            .with_error(LlmError::ConfigError("Missing API key".to_string()));
+        let mock =
+            MockLlmProvider::new().with_error(LlmError::ConfigError("Missing API key".to_string()));
 
         let messages = vec![Message {
             role: MessageRole::User,
@@ -576,7 +565,11 @@ mod tests {
         ];
 
         for error in retriable {
-            assert!(is_retriable_error(&error), "Error {:?} should be retriable", error);
+            assert!(
+                is_retriable_error(&error),
+                "Error {:?} should be retriable",
+                error
+            );
         }
 
         // 非重试错误
@@ -594,7 +587,11 @@ mod tests {
         ];
 
         for error in non_retriable {
-            assert!(!is_retriable_error(&error), "Error {:?} should not be retriable", error);
+            assert!(
+                !is_retriable_error(&error),
+                "Error {:?} should not be retriable",
+                error
+            );
         }
     }
 
@@ -660,8 +657,7 @@ mod tests {
 
     #[test]
     fn test_trait_object_safety() {
-        let mock: MockLlmProvider = MockLlmProvider::new()
-            .with_text_response("Trait test");
+        let mock: MockLlmProvider = MockLlmProvider::new().with_text_response("Trait test");
 
         // 测试 trait 对象可以创建
         let provider: &dyn LlmProvider = &mock;
@@ -692,18 +688,9 @@ mod tests {
 
     #[test]
     fn test_message_roles() {
-        assert_eq!(
-            format!("{:?}", MessageRole::System),
-            "System"
-        );
-        assert_eq!(
-            format!("{:?}", MessageRole::User),
-            "User"
-        );
-        assert_eq!(
-            format!("{:?}", MessageRole::Assistant),
-            "Assistant"
-        );
+        assert_eq!(format!("{:?}", MessageRole::System), "System");
+        assert_eq!(format!("{:?}", MessageRole::User), "User");
+        assert_eq!(format!("{:?}", MessageRole::Assistant), "Assistant");
     }
 
     #[test]
