@@ -233,7 +233,7 @@ impl Sandbox {
             });
         }
 
-        // 第二层: 通过 shell 执行转义后的命令
+        // 第二层: 执行转义后的命令
         let result = if cfg!(target_os = "windows") {
             timeout(
                 self.max_duration,
@@ -244,10 +244,13 @@ impl Sandbox {
             )
             .await
         } else {
+            // 直接执行命令，不通过 shell
+            let (program, args) = self.parse_command(cmd);
+
             timeout(
                 self.max_duration,
-                Command::new("sh")
-                    .args(["-c", &escaped_cmd])
+                Command::new(&program)
+                    .args(&args)
                     .kill_on_drop(true)
                     .output(),
             )
@@ -299,7 +302,7 @@ impl Sandbox {
             });
         }
 
-        // 第二层: 通过 shell 执行转义后的命令
+        // 第二层: 执行转义后的命令
         let result = if cfg!(target_os = "windows") {
             timeout(
                 self.max_duration,
@@ -310,10 +313,13 @@ impl Sandbox {
             )
             .await
         } else {
+            // 直接执行命令，不通过 shell
+            let (program, args) = self.parse_command(cmd);
+
             timeout(
                 self.max_duration,
-                Command::new("sh")
-                    .args(["-c", &escaped_cmd])
+                Command::new(&program)
+                    .args(&args)
                     .kill_on_drop(true)
                     .output(),
             )
