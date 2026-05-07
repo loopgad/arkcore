@@ -8,7 +8,6 @@
 //! - [`protocol`] - 共享协议（前后端消息类型）
 //! - [`services`] - 服务实现（Orchestrator, Sandbox, Memory）
 //! - [`platform`] - 平台适配（Windows/Unix 差异）
-//! - [`web`] - Web UI
 //! - [`cli`] - 命令行解析
 //! - [`repl`] - 交互式解释器
 //! - [`server`] - Axum HTTP 服务器
@@ -28,7 +27,6 @@ pub mod sandbox;
 pub mod security;
 pub mod server;
 pub mod services;
-pub mod web;
 
 pub use error::Error;
 
