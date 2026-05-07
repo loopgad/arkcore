@@ -14,7 +14,10 @@
 //! - [`hooks`] - 自定义 Hooks
 //! - [`styles`] - 样式
 
-use serde::{Deserialize, Serialize};
+pub use crate::protocol::{
+    AgentSnapshot, AgentStateLabel, ClientMessage, CommandOutput, ConnectionStatus, HealthLevel,
+    OutputType, SystemMetrics, WsMessage,
+};
 
 pub mod components;
 pub mod hooks;
@@ -30,40 +33,8 @@ pub use components::{
 pub use hooks::{use_agent_state, use_theme, use_websocket};
 pub use theme::{Theme, ThemeProvider};
 
-// Web UI 配置
-pub mod config {
-    use serde::{Deserialize, Serialize};
-
-    /// Web UI 配置
-    #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub struct WebUiConfig {
-        /// WebSocket 服务器地址
-        pub ws_url: String,
-        /// 默认主题
-        pub default_theme: super::theme::Theme,
-        /// 启用动画
-        pub animations_enabled: bool,
-        /// 自动重连
-        pub auto_reconnect: bool,
-        /// 重连间隔（毫秒）
-        pub reconnect_interval_ms: u64,
-    }
-
-    impl Default for WebUiConfig {
-        fn default() -> Self {
-            Self {
-                ws_url: "ws://127.0.0.1:8080/ws".to_string(),
-                default_theme: super::theme::Theme::Dark,
-                animations_enabled: true,
-                auto_reconnect: true,
-                reconnect_interval_ms: 3000,
-            }
-        }
-    }
-}
-
-/// Agent 状态枚举
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// Agent 状态枚举 (UI 层使用)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AgentStatus {
     /// 空闲
@@ -97,7 +68,7 @@ impl std::fmt::Display for AgentStatus {
 }
 
 /// Agent 信息
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AgentInfo {
     /// Agent ID
     pub id: String,
@@ -142,29 +113,8 @@ impl AgentInfo {
     }
 }
 
-/// WebSocket 消息类型
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", content = "data")]
-pub enum WsMessage {
-    /// Agent 状态更新
-    #[serde(rename = "agent_status")]
-    AgentStatus(AgentInfo),
-    /// 系统指标更新
-    #[serde(rename = "metrics")]
-    Metrics(MetricsData),
-    /// 连接状态更新
-    #[serde(rename = "connection")]
-    Connection(ConnectionStatus),
-    /// 命令输出
-    #[serde(rename = "output")]
-    Output(CommandOutput),
-    /// 错误消息
-    #[serde(rename = "error")]
-    Error(String),
-}
-
 /// 系统指标数据
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MetricsData {
     /// CPU 使用率
     pub cpu: f32,
@@ -176,32 +126,34 @@ pub struct MetricsData {
     pub latency_ms: u64,
 }
 
-/// 连接状态
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ConnectionStatus {
-    Connected,
-    Disconnected,
-    Reconnecting,
-}
+// Web UI 配置
+pub mod config {
+    use serde::{Deserialize, Serialize};
 
-/// 命令输出
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CommandOutput {
-    /// 输出内容
-    pub content: String,
-    /// 输出类型
-    pub output_type: OutputType,
-    /// 时间戳
-    pub timestamp: i64,
-}
+    /// Web UI 配置
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct WebUiConfig {
+        /// WebSocket 服务器地址
+        pub ws_url: String,
+        /// 默认主题
+        pub default_theme: super::theme::Theme,
+        /// 启用动画
+        pub animations_enabled: bool,
+        /// 自动重连
+        pub auto_reconnect: bool,
+        /// 重连间隔（毫秒）
+        pub reconnect_interval_ms: u64,
+    }
 
-/// 输出类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum OutputType {
-    Stdout,
-    Stderr,
-    System,
-    Result,
+    impl Default for WebUiConfig {
+        fn default() -> Self {
+            Self {
+                ws_url: "ws://127.0.0.1:8080/ws".to_string(),
+                default_theme: super::theme::Theme::Dark,
+                animations_enabled: true,
+                auto_reconnect: true,
+                reconnect_interval_ms: 3000,
+            }
+        }
+    }
 }

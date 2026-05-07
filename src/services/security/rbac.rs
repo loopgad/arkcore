@@ -11,7 +11,22 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::RwLock;
+use thiserror::Error;
+
+/// RBAC 错误类型
+#[derive(Error, Debug)]
+pub enum RbacError {
+    #[error("锁被毒化: {0}")]
+    LockPoisoned(String),
+    #[error("角色不存在: {0}")]
+    RoleNotFound(String),
+    #[error("权限不足: {0}")]
+    PermissionDenied(String),
+    #[error("用户不存在: {0}")]
+    UserNotFound(String),
+    #[error("无效操作: {0}")]
+    InvalidOperation(String),
+}
 
 /// 权限类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -185,15 +200,17 @@ pub struct PermissionRule {
     pub required_permission: Permission,
 }
 
+/// RBAC 服务内部状态
+struct RbacServiceInner {
+    /// 用户角色映射
+    user_roles: HashMap<String, UserRole>,
+    /// 权限规则
+    rules: Vec<PermissionRule>,
+}
+
 /// RBAC 服务
 pub struct RbacService {
-    /// 用户角色映射
-    user_roles: RwLock<HashMap<String, UserRole>>,
-    /// 权限规则
-    rules: RwLock<Vec<PermissionRule>>,
-    /// 角色层次
-    #[allow(dead_code)]
-    role_hierarchy: RwLock<HashMap<Role, Vec<Role>>>,
+    inner: parking_lot::RwLock<RbacServiceInner>,
 }
 
 impl Default for RbacService {
@@ -205,21 +222,7 @@ impl Default for RbacService {
 impl RbacService {
     /// 创建新的 RBAC 服务
     pub fn new() -> Self {
-        let service = Self {
-            user_roles: RwLock::new(HashMap::new()),
-            rules: RwLock::new(Vec::new()),
-            role_hierarchy: RwLock::new(HashMap::new()),
-        };
-
-        // 注册默认规则
-        service.register_default_rules();
-        service
-    }
-
-    /// 注册默认规则
-    fn register_default_rules(&self) {
         let default_rules = vec![
-            // 用户管理
             PermissionRule {
                 resource_action: ResourceAction::new("user", "create"),
                 required_permission: Permission::Admin,
@@ -232,7 +235,6 @@ impl RbacService {
                 resource_action: ResourceAction::new("user", "list"),
                 required_permission: Permission::Admin,
             },
-            // 命令执行
             PermissionRule {
                 resource_action: ResourceAction::new("command", "execute"),
                 required_permission: Permission::Execute,
@@ -241,7 +243,6 @@ impl RbacService {
                 resource_action: ResourceAction::new("command", "execute_admin"),
                 required_permission: Permission::Admin,
             },
-            // 配置管理
             PermissionRule {
                 resource_action: ResourceAction::new("config", "read"),
                 required_permission: Permission::Read,
@@ -250,7 +251,6 @@ impl RbacService {
                 resource_action: ResourceAction::new("config", "write"),
                 required_permission: Permission::Admin,
             },
-            // API 密钥
             PermissionRule {
                 resource_action: ResourceAction::new("apikey", "create"),
                 required_permission: Permission::Admin,
@@ -259,7 +259,6 @@ impl RbacService {
                 resource_action: ResourceAction::new("apikey", "list"),
                 required_permission: Permission::Admin,
             },
-            // 审计日志
             PermissionRule {
                 resource_action: ResourceAction::new("audit", "read"),
                 required_permission: Permission::Admin,
@@ -270,27 +269,31 @@ impl RbacService {
             },
         ];
 
-        let mut rules = self.rules.write().unwrap();
-        rules.extend(default_rules);
+        Self {
+            inner: parking_lot::RwLock::new(RbacServiceInner {
+                user_roles: HashMap::new(),
+                rules: default_rules,
+            }),
+        }
     }
 
     /// 分配角色给用户
     pub fn assign_role(&self, user_id: &str, role: Role) -> Result<(), RbacError> {
-        let mut roles = self.user_roles.write().unwrap();
-
-        if let Some(existing) = roles.get_mut(user_id) {
+        let mut inner = self.inner.write();
+        if let Some(existing) = inner.user_roles.get_mut(user_id) {
             existing.role = role;
         } else {
-            roles.insert(user_id.to_string(), UserRole::new(user_id, user_id, role));
+            inner
+                .user_roles
+                .insert(user_id.to_string(), UserRole::new(user_id, user_id, role));
         }
-
         Ok(())
     }
 
     /// 获取用户角色
     pub fn get_user_role(&self, user_id: &str) -> Option<UserRole> {
-        let roles = self.user_roles.read().unwrap();
-        roles.get(user_id).cloned()
+        let inner = self.inner.read();
+        inner.user_roles.get(user_id).cloned()
     }
 
     /// 检查用户是否有权限
@@ -300,9 +303,10 @@ impl RbacService {
         resource_type: &str,
         action: &str,
     ) -> PermissionCheckResult {
+        let inner = self.inner.read();
+
         // 获取用户角色
-        let roles = self.user_roles.read().unwrap();
-        let user_role = match roles.get(user_id) {
+        let user_role = match inner.user_roles.get(user_id) {
             Some(r) => r,
             None => return PermissionCheckResult::denied("用户不存在", None),
         };
@@ -316,8 +320,8 @@ impl RbacService {
         let user_permissions = user_role.get_permissions();
 
         // 查找所需规则
-        let rules = self.rules.read().unwrap();
-        let required_permission = rules
+        let required_permission = inner
+            .rules
             .iter()
             .find(|r| {
                 r.resource_action.resource_type == resource_type
@@ -370,14 +374,10 @@ impl RbacService {
             }
         }
 
-        if let Some(roles) = self
-            .user_roles
-            .read()
-            .ok()
-            .and_then(|r| r.get(user_id).cloned())
-        {
+        let inner = self.inner.read();
+        if let Some(user_role) = inner.user_roles.get(user_id) {
             PermissionCheckResult::denied(
-                format!("用户 {} 没有满足要求的权限", roles.username),
+                format!("用户 {} 没有满足要求的权限", user_role.username),
                 None,
             )
         } else {
@@ -387,56 +387,30 @@ impl RbacService {
 
     /// 注册权限规则
     pub fn register_rule(&self, rule: PermissionRule) -> Result<(), RbacError> {
-        let mut rules = self.rules.write().unwrap();
-        rules.push(rule);
+        let mut inner = self.inner.write();
+        inner.rules.push(rule);
         Ok(())
     }
 
     /// 获取所有规则
     pub fn get_rules(&self) -> Vec<PermissionRule> {
-        let rules = self.rules.read().unwrap();
-        rules.clone()
+        let inner = self.inner.read();
+        inner.rules.clone()
     }
 
     /// 移除用户角色
     pub fn remove_user_role(&self, user_id: &str) -> Result<(), RbacError> {
-        let mut roles = self.user_roles.write().unwrap();
-        roles.remove(user_id);
+        let mut inner = self.inner.write();
+        inner.user_roles.remove(user_id);
         Ok(())
     }
 
     /// 获取所有用户角色
     pub fn get_all_user_roles(&self) -> HashMap<String, UserRole> {
-        let roles = self.user_roles.read().unwrap();
-        roles.clone()
+        let inner = self.inner.read();
+        inner.user_roles.clone()
     }
 }
-
-/// RBAC 错误类型
-#[derive(Debug, Clone)]
-pub enum RbacError {
-    /// 用户不存在
-    UserNotFound,
-    /// 角色不存在
-    RoleNotFound,
-    /// 权限不足
-    InsufficientPermission,
-    /// 无效操作
-    InvalidOperation(String),
-}
-
-impl std::fmt::Display for RbacError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RbacError::UserNotFound => write!(f, "用户不存在"),
-            RbacError::RoleNotFound => write!(f, "角色不存在"),
-            RbacError::InsufficientPermission => write!(f, "权限不足"),
-            RbacError::InvalidOperation(msg) => write!(f, "无效操作: {}", msg),
-        }
-    }
-}
-
-impl std::error::Error for RbacError {}
 
 /// 权限中间件 trait
 pub trait PermissionMiddleware: Send + Sync {
@@ -546,6 +520,6 @@ mod tests {
         let middleware = RbacMiddleware::new(std::sync::Arc::new(rbac));
 
         assert!(middleware.check("user1", "command", "execute"));
-        assert!(middleware.check("user1", "user", "create")); // Admin 有权限创建用户
+        assert!(middleware.check("user1", "user", "create"));
     }
 }

@@ -12,7 +12,9 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use tokio::sync::broadcast;
+
+use crate::orchestrator::AgentState;
 
 /// 健康状态级别
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -83,9 +85,9 @@ pub struct HealthManager {
     /// 启动时间戳
     start_time: std::time::Instant,
     /// 数据库健康状态
-    db_health: RwLock<DatabaseHealth>,
+    db_health: std::sync::RwLock<DatabaseHealth>,
     /// 沙盒健康状态
-    sandbox_health: RwLock<SandboxHealth>,
+    sandbox_health: std::sync::RwLock<SandboxHealth>,
 }
 
 impl HealthManager {
@@ -93,12 +95,12 @@ impl HealthManager {
     pub fn new() -> Self {
         Self {
             start_time: std::time::Instant::now(),
-            db_health: RwLock::new(DatabaseHealth {
+            db_health: std::sync::RwLock::new(DatabaseHealth {
                 connected: true,
                 pool_size: 5,
                 active_connections: 0,
             }),
-            sandbox_health: RwLock::new(SandboxHealth {
+            sandbox_health: std::sync::RwLock::new(SandboxHealth {
                 available: true,
                 active_instances: 0,
                 max_instances: 10,
@@ -112,21 +114,26 @@ impl HealthManager {
     }
 
     /// 更新数据库健康状态
-    pub async fn update_database_health(&self, health: DatabaseHealth) {
-        let mut db = self.db_health.write().await;
-        *db = health;
+    pub fn update_database_health(&self, health: DatabaseHealth) {
+        if let Ok(mut db) = self.db_health.write() {
+            *db = health;
+        }
     }
 
     /// 更新沙盒健康状态
-    pub async fn update_sandbox_health(&self, health: SandboxHealth) {
-        let mut sandbox = self.sandbox_health.write().await;
-        *sandbox = health;
+    pub fn update_sandbox_health(&self, health: SandboxHealth) {
+        if let Ok(mut sandbox) = self.sandbox_health.write() {
+            *sandbox = health;
+        }
     }
 
     /// 获取当前健康状态
-    pub async fn get_status(&self) -> HealthStatus {
-        let db_health = self.db_health.read().await;
-        let sandbox_health = self.sandbox_health.read().await;
+    pub fn get_status(&self) -> HealthStatus {
+        let db_health = self.db_health.read().unwrap_or_else(|e| e.into_inner());
+        let sandbox_health = self
+            .sandbox_health
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
 
         // 获取内存使用情况
         let memory = MemoryHealth {
@@ -161,8 +168,8 @@ impl HealthManager {
     }
 
     /// 获取简略健康状态
-    pub async fn get_simple_status(&self) -> HealthResponse {
-        let status = self.get_status().await;
+    pub fn get_simple_status(&self) -> HealthResponse {
+        let status = self.get_status();
         HealthResponse {
             status: match status.level {
                 HealthLevel::Healthy => "healthy".to_string(),
@@ -187,17 +194,34 @@ impl Default for HealthManager {
 #[derive(Clone)]
 pub struct AppState {
     pub health_manager: Arc<HealthManager>,
+    pub agent_state_tx: broadcast::Sender<AgentState>,
+    pub orchestrator: Option<Arc<crate::orchestrator::Orchestrator>>,
 }
 
 impl AppState {
     pub fn new(health_manager: Arc<HealthManager>) -> Self {
-        Self { health_manager }
+        let (agent_state_tx, _) = broadcast::channel(16);
+        Self {
+            health_manager,
+            agent_state_tx,
+            orchestrator: None,
+        }
+    }
+
+    /// 订阅 Agent 状态变化
+    pub fn subscribe_agent_state(&self) -> broadcast::Receiver<AgentState> {
+        self.agent_state_tx.subscribe()
+    }
+
+    /// 广播 Agent 状态变化
+    pub fn broadcast_agent_state(&self, state: &AgentState) {
+        let _ = self.agent_state_tx.send(state.clone());
     }
 }
 
 /// 详细健康检查处理器（GET /health/detailed）
 pub async fn health_detailed_handler(State(state): State<AppState>) -> Response {
-    let status = state.health_manager.get_status().await;
+    let status = state.health_manager.get_status();
 
     let http_status = match status.level {
         HealthLevel::Healthy => StatusCode::OK,
@@ -210,7 +234,7 @@ pub async fn health_detailed_handler(State(state): State<AppState>) -> Response 
 
 /// 简单健康检查处理器（GET /health）
 pub async fn health_handler(State(state): State<AppState>) -> Response {
-    let response = state.health_manager.get_simple_status().await;
+    let response = state.health_manager.get_simple_status();
 
     let http_status = match response.status.as_str() {
         "healthy" | "degraded" => StatusCode::OK,
@@ -224,125 +248,116 @@ pub async fn health_handler(State(state): State<AppState>) -> Response {
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn test_health_manager_default() {
+    #[test]
+    fn test_health_manager_default() {
         let manager = HealthManager::new();
-        let status = manager.get_status().await;
+        let status = manager.get_status();
 
         assert_eq!(status.level, HealthLevel::Healthy);
         assert!(status.database.connected);
         assert!(status.sandbox.available);
     }
 
-    #[tokio::test]
-    async fn test_health_manager_uptime() {
+    #[test]
+    fn test_health_manager_uptime() {
         let manager = HealthManager::new();
-        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-        // 使用 elapsed().as_millis() 因为 10ms < 1秒，as_secs() 会返回 0
+        std::thread::sleep(std::time::Duration::from_millis(10));
         assert!(manager.start_time.elapsed().as_millis() >= 10);
     }
 
-    #[tokio::test]
-    async fn test_simple_health_response() {
+    #[test]
+    fn test_simple_health_response() {
         let manager = HealthManager::new();
-        let response = manager.get_simple_status().await;
+        let response = manager.get_simple_status();
 
         assert_eq!(response.status, "healthy");
         assert!(response.timestamp > 0);
     }
 
-    #[tokio::test]
-    async fn test_unhealthy_state() {
+    #[test]
+    fn test_unhealthy_state() {
         let manager = HealthManager::new();
 
         // 设置数据库为断开连接
-        manager
-            .update_database_health(DatabaseHealth {
-                connected: false,
-                pool_size: 5,
-                active_connections: 0,
-            })
-            .await;
+        manager.update_database_health(DatabaseHealth {
+            connected: false,
+            pool_size: 5,
+            active_connections: 0,
+        });
 
-        let status = manager.get_status().await;
+        let status = manager.get_status();
         assert_eq!(status.level, HealthLevel::Unhealthy);
     }
 
-    #[tokio::test]
-    async fn test_degraded_state_pool_exhaustion() {
+    #[test]
+    fn test_degraded_state_pool_exhaustion() {
         let manager = HealthManager::new();
 
         // 设置连接池耗尽但未完全断开
-        manager
-            .update_database_health(DatabaseHealth {
-                connected: true,
-                pool_size: 5,
-                active_connections: 5, // 全部用完
-            })
-            .await;
+        manager.update_database_health(DatabaseHealth {
+            connected: true,
+            pool_size: 5,
+            active_connections: 5, // 全部用完
+        });
 
-        let status = manager.get_status().await;
+        let status = manager.get_status();
         assert_eq!(status.level, HealthLevel::Degraded);
     }
 
-    #[tokio::test]
-    async fn test_degraded_state_sandbox_exhaustion() {
+    #[test]
+    fn test_degraded_state_sandbox_exhaustion() {
         let manager = HealthManager::new();
 
         // 设置沙盒实例耗尽
-        manager
-            .update_sandbox_health(SandboxHealth {
-                available: true,
-                active_instances: 10,
-                max_instances: 10, // 全部用完
-            })
-            .await;
+        manager.update_sandbox_health(SandboxHealth {
+            available: true,
+            active_instances: 10,
+            max_instances: 10, // 全部用完
+        });
 
-        let status = manager.get_status().await;
+        let status = manager.get_status();
         assert_eq!(status.level, HealthLevel::Degraded);
     }
 
-    #[tokio::test]
-    async fn test_update_sandbox_health() {
+    #[test]
+    fn test_update_sandbox_health() {
         let manager = HealthManager::new();
 
-        manager
-            .update_sandbox_health(SandboxHealth {
-                available: false,
-                active_instances: 5,
-                max_instances: 10,
-            })
-            .await;
+        manager.update_sandbox_health(SandboxHealth {
+            available: false,
+            active_instances: 5,
+            max_instances: 10,
+        });
 
-        let status = manager.get_status().await;
+        let status = manager.get_status();
         assert!(!status.sandbox.available);
         assert_eq!(status.level, HealthLevel::Unhealthy);
     }
 
-    #[tokio::test]
-    async fn test_health_response_timestamp() {
+    #[test]
+    fn test_health_response_timestamp() {
         let manager = HealthManager::new();
         let before = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or(0);
 
-        let response = manager.get_simple_status().await;
+        let response = manager.get_simple_status();
 
         assert!(response.timestamp >= before);
     }
 
-    #[tokio::test]
-    async fn test_health_status_version() {
+    #[test]
+    fn test_health_status_version() {
         let manager = HealthManager::new();
-        let status = manager.get_status().await;
+        let status = manager.get_status();
 
         // 版本应该是有效的非空字符串
         assert!(!status.version.is_empty());
     }
 
-    #[tokio::test]
-    async fn test_app_state_creation() {
+    #[test]
+    fn test_app_state_creation() {
         let health_manager = Arc::new(HealthManager::new());
         let app_state = AppState::new(health_manager);
 

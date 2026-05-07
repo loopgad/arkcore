@@ -165,6 +165,7 @@ dependencies = [
  "libc",
  "mockall",
  "moka",
+ "parking_lot",
  "pbkdf2",
  "rand 0.8.6",
  "reqwest",

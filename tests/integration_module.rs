@@ -111,18 +111,18 @@ async fn test_orchestrator_state_history() {
 }
 
 /// 测试健康检查模块
-#[tokio::test]
-async fn test_health_check_integration() {
+#[test]
+fn test_health_check_integration() {
     let health_manager = HealthManager::new();
 
     // 验证初始健康状态
-    let status = health_manager.get_status().await;
+    let status = health_manager.get_status();
     assert_eq!(status.level, HealthLevel::Healthy);
     assert!(status.database.connected);
     assert!(status.sandbox.available);
 
     // 验证简单健康响应
-    let response = health_manager.get_simple_status().await;
+    let response = health_manager.get_simple_status();
     assert_eq!(response.status, "healthy");
     assert!(response.timestamp > 0);
 }

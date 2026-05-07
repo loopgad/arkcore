@@ -80,26 +80,48 @@ impl UseWebSocket {
         &self.url
     }
 
-    /// 模拟连接（用于演示）
+    /// 连接到 WebSocket 服务器
+    pub fn connect(&mut self) {
+        self.state.status = ConnectionStatus::Reconnecting;
+        self.state.error = None;
+        // 实际连接逻辑会在 WASM 环境中实现
+        // 这里只是更新状态
+    }
+
+    /// 断开连接
+    pub fn disconnect(&mut self) {
+        self.state.status = ConnectionStatus::Disconnected;
+        self.state.reconnect_attempts = 0;
+    }
+
+    /// 模拟连接成功（用于测试）
     pub fn simulate_connect(&mut self) {
         self.state.status = ConnectionStatus::Connected;
         self.state.last_message_at = Some(chrono::Utc::now().timestamp());
         self.state.error = None;
     }
 
-    /// 模拟断开连接（用于演示）
+    /// 模拟断开连接（用于测试）
     pub fn simulate_disconnect(&mut self) {
         self.state.status = ConnectionStatus::Disconnected;
     }
 
-    /// 模拟重连中（用于演示）
+    /// 模拟重连中（用于测试）
     pub fn simulate_reconnecting(&mut self) {
         self.state.status = ConnectionStatus::Reconnecting;
         self.state.reconnect_attempts += 1;
     }
 
-    /// 模拟收到消息（用于演示）
+    /// 模拟收到消息（用于测试）
     pub fn simulate_message(&mut self, msg: WsMessage) {
+        self.state.last_message_at = Some(chrono::Utc::now().timestamp());
+        if let Some(ref handler) = self.message_handler {
+            handler(msg);
+        }
+    }
+
+    /// 处理收到的消息
+    pub fn handle_message(&mut self, msg: WsMessage) {
         self.state.last_message_at = Some(chrono::Utc::now().timestamp());
         if let Some(ref handler) = self.message_handler {
             handler(msg);

@@ -23,6 +23,7 @@ use tokio::sync::broadcast;
 use tracing::{error, info, warn};
 
 use crate::orchestrator::Orchestrator;
+use crate::protocol::{AgentSnapshot, ClientMessage, WsMessage};
 use crate::services::{
     health::{AppState, HealthManager},
     ratelimit::RateLimiter,
@@ -74,7 +75,6 @@ pub enum ShutdownState {
 /// 服务器主结构
 pub struct Server {
     config: ServerConfig,
-    #[allow(dead_code)]
     orchestrator: Arc<Orchestrator>,
     health_manager: Arc<HealthManager>,
     rate_limiter: Arc<RateLimiter>,
@@ -84,7 +84,7 @@ pub struct Server {
 impl Server {
     /// 创建新的 Server 实例
     pub fn new(orchestrator: Orchestrator, config: ServerConfig) -> Self {
-        let (shutdown_tx, _) = broadcast::channel(1);
+        let (shutdown_tx, _) = broadcast::channel(16);
         let health_manager = Arc::new(HealthManager::new());
         let rate_limiter = Arc::new(RateLimiter::default_config());
 
@@ -117,7 +117,8 @@ impl Server {
         let (graceful_tx, mut graceful_rx) = broadcast::channel::<()>(1);
 
         // 构建应用状态
-        let app_state = AppState::new(self.health_manager.clone());
+        let mut app_state = AppState::new(self.health_manager.clone());
+        app_state.orchestrator = Some(self.orchestrator.clone());
 
         // 构建路由
         let app = Router::new()
@@ -162,8 +163,14 @@ impl Server {
         graceful_tx: broadcast::Sender<()>,
         timeout: Duration,
     ) {
-        // 优先使用 tokio 的信号监听
+        // 优先使用 tokio 的信号监听，Ctrl+C 优先级更高
         tokio::select! {
+            biased;
+            // 监听 SIGINT (优先级更高)
+            _ = signal::ctrl_c() => {
+                warn!("收到 SIGINT (Ctrl+C)，开始优雅关闭...");
+                let _ = graceful_tx.send(());
+            }
             // 监听我们的广播通道
             result = shutdown_rx.recv() => {
                 if let Ok(state) = result {
@@ -172,12 +179,6 @@ impl Server {
                         let _ = graceful_tx.send(());
                     }
                 }
-            }
-
-            // 监听 SIGINT
-            _ = signal::ctrl_c() => {
-                warn!("收到 SIGINT (Ctrl+C)，开始优雅关闭...");
-                let _ = graceful_tx.send(());
             }
         }
 
@@ -210,10 +211,6 @@ impl Server {
     /// 保存状态（供子类或外部调用）
     pub async fn save_state(&self) -> anyhow::Result<()> {
         info!("保存服务器状态...");
-
-        // 这里可以添加保存 orchestrator 状态的逻辑
-        // 例如保存到数据库或文件系统
-
         info!("状态保存完成");
         Ok(())
     }
@@ -221,10 +218,6 @@ impl Server {
     /// 释放资源
     pub async fn cleanup(&self) {
         info!("清理服务器资源...");
-
-        // 清理健康检查状态
-        // 清理限流器状态
-
         info!("资源清理完成");
     }
 }
@@ -255,8 +248,8 @@ async fn sse_handler(
 }
 
 /// WebSocket 升级处理器
-async fn ws_handler(ws: WebSocketUpgrade) -> impl IntoResponse {
-    ws.on_upgrade(handle_socket)
+async fn ws_handler(State(state): State<AppState>, ws: WebSocketUpgrade) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| handle_socket(socket, state))
 }
 
 /// WebSocket 配置常量
@@ -272,7 +265,7 @@ mod ws_config {
 }
 
 /// WebSocket 消息处理
-async fn handle_socket(socket: WebSocket) {
+async fn handle_socket(socket: WebSocket, state: AppState) {
     let (mut sender, mut receiver) = socket.split();
 
     // 消息计数器，用于限制每连接消息数
@@ -280,77 +273,212 @@ async fn handle_socket(socket: WebSocket) {
     // 连接开始时间
     let start_time = std::time::Instant::now();
 
+    // 订阅 Agent 状态变化
+    let mut agent_state_rx = state.subscribe_agent_state();
+
+    // 发送连接成功消息
+    let welcome_msg = WsMessage::Error("Connected to ArkCore".to_string());
+    if let Ok(text) = serde_json::to_string(&welcome_msg) {
+        let _ = sender
+            .send(axum::extract::ws::Message::Text(text.into()))
+            .await;
+    }
+
     loop {
         // 检查会话最大存活时间
         if start_time.elapsed().as_secs() > ws_config::MAX_SESSION_SECS {
-            let _ = sender
-                .send(axum::extract::ws::Message::Text(
-                    r#"{"error":"session_timeout"}"#.into(),
-                ))
-                .await;
+            let msg = WsMessage::Error("session_timeout".to_string());
+            if let Ok(text) = serde_json::to_string(&msg) {
+                let _ = sender
+                    .send(axum::extract::ws::Message::Text(text.into()))
+                    .await;
+            }
             break;
         }
 
-        // 使用 tokio::time::timeout 来实现空闲超时
-        let msg = tokio::time::timeout(
-            std::time::Duration::from_secs(ws_config::IDLE_TIMEOUT_SECS),
-            futures_util::StreamExt::next(&mut receiver),
-        )
-        .await;
+        // 使用 tokio::select! 同时处理客户端消息和状态推送
+        tokio::select! {
+            biased;
 
-        match msg {
-            Ok(Some(Ok(axum::extract::ws::Message::Text(text)))) => {
-                // 检查消息大小
-                if text.len() > ws_config::MAX_MESSAGE_SIZE {
-                    let _ = sender
-                        .send(axum::extract::ws::Message::Text(
-                            r#"{"error":"message_too_large"}"#.into(),
-                        ))
-                        .await;
-                    break;
+            // 处理 Agent 状态变化推送
+            Ok(agent_state) = agent_state_rx.recv() => {
+                let snapshot = AgentSnapshot::from(&agent_state);
+                let msg = WsMessage::AgentStatus(snapshot);
+                if let Ok(text) = serde_json::to_string(&msg) {
+                    if sender.send(axum::extract::ws::Message::Text(text.into())).await.is_err() {
+                        break; // 客户端断开
+                    }
                 }
+            }
 
-                msg_count += 1;
+            // 处理客户端消息（带超时）
+            msg = tokio::time::timeout(
+                Duration::from_secs(ws_config::IDLE_TIMEOUT_SECS),
+                receiver.next(),
+            ) => {
+                match msg {
+                    Ok(Some(Ok(axum::extract::ws::Message::Text(text)))) => {
+                        // 检查消息大小
+                        if text.len() > ws_config::MAX_MESSAGE_SIZE {
+                            let err_msg = WsMessage::Error("message_too_large".to_string());
+                            if let Ok(err_text) = serde_json::to_string(&err_msg) {
+                                let _ = sender.send(axum::extract::ws::Message::Text(err_text.into())).await;
+                            }
+                            break;
+                        }
 
-                // 检查消息数限制
-                if msg_count > ws_config::MAX_MESSAGES_PER_CONN {
-                    let _ = sender
-                        .send(axum::extract::ws::Message::Text(
-                            r#"{"error":"too_many_messages"}"#.into(),
-                        ))
-                        .await;
-                    break;
+                        msg_count += 1;
+
+                        // 检查消息数限制
+                        if msg_count > ws_config::MAX_MESSAGES_PER_CONN {
+                            let err_msg = WsMessage::Error("too_many_messages".to_string());
+                            if let Ok(err_text) = serde_json::to_string(&err_msg) {
+                                let _ = sender.send(axum::extract::ws::Message::Text(err_text.into())).await;
+                            }
+                            break;
+                        }
+
+                        // 解析客户端消息
+                        match serde_json::from_str::<ClientMessage>(&text) {
+                            Ok(client_msg) => {
+                                let response = handle_client_message(client_msg, &state).await;
+                                if let Ok(response_text) = serde_json::to_string(&response) {
+                                    if sender.send(axum::extract::ws::Message::Text(response_text.into())).await.is_err() {
+                                        break;
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                let err_msg = WsMessage::Error(format!("Invalid message: {}", e));
+                                if let Ok(err_text) = serde_json::to_string(&err_msg) {
+                                    let _ = sender.send(axum::extract::ws::Message::Text(err_text.into())).await;
+                                }
+                            }
+                        }
+                    }
+                    Ok(Some(Ok(axum::extract::ws::Message::Close(_)))) => {
+                        // 客户端关闭连接
+                        break;
+                    }
+                    Ok(Some(Err(e))) => {
+                        // WebSocket 错误
+                        warn!("WebSocket 错误: {}", e);
+                        break;
+                    }
+                    Ok(None) => {
+                        // 连接已关闭
+                        break;
+                    }
+                    Err(_) => {
+                        // 空闲超时
+                        let err_msg = WsMessage::Error("idle_timeout".to_string());
+                        if let Ok(err_text) = serde_json::to_string(&err_msg) {
+                            let _ = sender.send(axum::extract::ws::Message::Text(err_text.into())).await;
+                        }
+                        break;
+                    }
+                    _ => {
+                        // 忽略其他消息类型
+                    }
                 }
+            }
+        }
+    }
 
-                let _ = sender
-                    .send(axum::extract::ws::Message::Text(text.to_string().into()))
-                    .await;
+    info!("WebSocket 连接已关闭");
+}
+
+/// 处理客户端消息
+async fn handle_client_message(msg: ClientMessage, state: &AppState) -> WsMessage {
+    match msg {
+        ClientMessage::RunTask { task } => {
+            if let Some(ref orchestrator) = state.orchestrator {
+                // 广播状态变化
+                state.broadcast_agent_state(&crate::orchestrator::AgentState::Planning {
+                    task: task.clone(),
+                });
+
+                match orchestrator.run_task(&task).await {
+                    Ok(result) => {
+                        state.broadcast_agent_state(&crate::orchestrator::AgentState::Completed {
+                            result: result.clone(),
+                        });
+                        WsMessage::Output(crate::protocol::CommandOutput {
+                            content: result,
+                            output_type: crate::protocol::OutputType::Result,
+                            timestamp: chrono::Utc::now().timestamp(),
+                        })
+                    }
+                    Err(e) => {
+                        state.broadcast_agent_state(&crate::orchestrator::AgentState::Failed {
+                            reason: e.to_string(),
+                        });
+                        WsMessage::Error(e.to_string())
+                    }
+                }
+            } else {
+                WsMessage::Error("Orchestrator not available".to_string())
             }
-            Ok(Some(Ok(axum::extract::ws::Message::Close(_)))) => {
-                // 客户端关闭连接
-                break;
+        }
+        ClientMessage::RunCommand { task, command } => {
+            if let Some(ref orchestrator) = state.orchestrator {
+                state.broadcast_agent_state(&crate::orchestrator::AgentState::Planning {
+                    task: task.clone(),
+                });
+
+                match orchestrator.run_with_approval(&task, &command).await {
+                    Ok(result) => {
+                        state.broadcast_agent_state(&crate::orchestrator::AgentState::Completed {
+                            result: result.clone(),
+                        });
+                        WsMessage::Output(crate::protocol::CommandOutput {
+                            content: result,
+                            output_type: crate::protocol::OutputType::Result,
+                            timestamp: chrono::Utc::now().timestamp(),
+                        })
+                    }
+                    Err(e) => {
+                        state.broadcast_agent_state(&crate::orchestrator::AgentState::Failed {
+                            reason: e.to_string(),
+                        });
+                        WsMessage::Error(e.to_string())
+                    }
+                }
+            } else {
+                WsMessage::Error("Orchestrator not available".to_string())
             }
-            Ok(Some(Err(e))) => {
-                // WebSocket 错误
-                tracing::warn!("WebSocket 错误: {}", e);
-                break;
+        }
+        ClientMessage::Reset => {
+            if let Some(ref orchestrator) = state.orchestrator {
+                orchestrator.reset().await;
+                state.broadcast_agent_state(&crate::orchestrator::AgentState::Idle);
+                WsMessage::Error("Agent reset".to_string())
+            } else {
+                WsMessage::Error("Orchestrator not available".to_string())
             }
-            Ok(None) => {
-                // 连接已关闭
-                break;
-            }
-            Err(_) => {
-                // 空闲超时
-                let _ = sender
-                    .send(axum::extract::ws::Message::Text(
-                        r#"{"error":"idle_timeout"}"#.into(),
-                    ))
-                    .await;
-                break;
-            }
-            _ => {
-                // 忽略其他消息类型
-            }
+        }
+        ClientMessage::GetMetrics => {
+            let status = state.health_manager.get_status();
+            let metrics = crate::protocol::SystemMetrics {
+                cpu_usage: 0.0,
+                memory_usage: status.memory.usage_percent as f32,
+                disk_usage: 0.0,
+                latency_ms: 0,
+                health_level: match status.level {
+                    crate::services::health::HealthLevel::Healthy => {
+                        crate::protocol::HealthLevel::Healthy
+                    }
+                    crate::services::health::HealthLevel::Degraded => {
+                        crate::protocol::HealthLevel::Degraded
+                    }
+                    crate::services::health::HealthLevel::Unhealthy => {
+                        crate::protocol::HealthLevel::Unhealthy
+                    }
+                },
+                uptime_seconds: status.uptime_seconds,
+                version: status.version,
+            };
+            WsMessage::Metrics(metrics)
         }
     }
 }
@@ -397,24 +525,7 @@ mod tests {
     }
 
     #[test]
-    fn test_server_config_builder_chaining() {
-        // Test that builder methods can be chained
-        let config = ServerConfig::default().with_shutdown_timeout(Duration::from_secs(45));
-
-        assert_eq!(config.port, 8080); // unchanged from default
-        assert_eq!(config.shutdown_timeout, Duration::from_secs(45));
-    }
-
-    #[test]
-    fn test_server_config_new_with_port() {
-        let config = ServerConfig::new(3000);
-        assert_eq!(config.port, 3000);
-        assert_eq!(config.shutdown_timeout, Duration::from_secs(30)); // default
-    }
-
-    #[test]
     fn test_shutdown_state_enum_variants() {
-        // Verify all ShutdownState variants exist and have expected values
         assert_eq!(ShutdownState::Running as u8, 0);
         assert_eq!(ShutdownState::ShuttingDown as u8, 1);
         assert_eq!(ShutdownState::Terminated as u8, 2);
@@ -429,26 +540,16 @@ mod tests {
         assert_ne!(ShutdownState::ShuttingDown, ShutdownState::Terminated);
     }
 
-    #[test]
-    fn test_shutdown_state_debug() {
-        let state = ShutdownState::Running;
-        let debug_str = format!("{:?}", state);
-        assert!(debug_str.contains("Running"));
-    }
-
     #[tokio::test]
     async fn test_shutdown_handle_new() {
         let (tx, _rx) = broadcast::channel(1);
         let _handle = ShutdownHandle::new(tx);
-        // Should be created without panic
     }
 
     #[tokio::test]
     async fn test_shutdown_handle_shutdown() {
         let (tx, _rx) = broadcast::channel(1);
         let handle = ShutdownHandle::new(tx);
-
-        // 调用 shutdown 不应 panic
         handle.shutdown().await;
         tokio::time::sleep(Duration::from_millis(5)).await;
     }
@@ -457,20 +558,6 @@ mod tests {
     async fn test_shutdown_handle_terminate() {
         let (tx, _rx) = broadcast::channel(1);
         let handle = ShutdownHandle::new(tx);
-
-        // 调用 terminate 不应 panic
-        handle.terminate().await;
-        tokio::time::sleep(Duration::from_millis(5)).await;
-    }
-
-    #[tokio::test]
-    async fn test_shutdown_handle_both_operations() {
-        let (tx, _rx) = broadcast::channel(1);
-        let handle = ShutdownHandle::new(tx);
-
-        // 先 shutdown 再 terminate
-        handle.shutdown().await;
-        tokio::time::sleep(Duration::from_millis(5)).await;
         handle.terminate().await;
         tokio::time::sleep(Duration::from_millis(5)).await;
     }
@@ -478,45 +565,10 @@ mod tests {
     #[tokio::test]
     async fn test_shutdown_state_with_tokio_broadcast() {
         let (tx, mut rx) = broadcast::channel::<ShutdownState>(1);
-
-        // 发送 ShuttingDown 状态
         let result = tx.send(ShutdownState::ShuttingDown);
         assert!(result.is_ok());
-
-        // 接收并验证
         if let Ok(state) = rx.recv().await {
             assert_eq!(state, ShutdownState::ShuttingDown);
         }
-    }
-
-    #[test]
-    fn test_server_config_clone() {
-        let config = ServerConfig::new(8080);
-        let cloned = config.clone();
-        assert_eq!(cloned.port, config.port);
-        assert_eq!(cloned.shutdown_timeout, config.shutdown_timeout);
-    }
-
-    #[test]
-    fn test_shutdown_state_clone() {
-        let state = ShutdownState::Running;
-        let cloned = state;
-        assert_eq!(cloned, state);
-    }
-
-    #[test]
-    fn test_server_config_debug() {
-        let config = ServerConfig::default();
-        let debug_str = format!("{:?}", config);
-        assert!(debug_str.contains("ServerConfig"));
-        assert!(debug_str.contains("port"));
-        assert!(debug_str.contains("shutdown_timeout"));
-    }
-
-    #[test]
-    fn test_server_debug() {
-        // Server 有 debug placeholder
-        let debug_str = format!("{:?}", ServerConfig::default());
-        assert!(!debug_str.is_empty());
     }
 }

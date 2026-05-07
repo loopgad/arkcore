@@ -202,19 +202,11 @@ impl Orchestrator {
     }
 }
 
-/// SAFETY: Orchestrator is safe to send across thread boundaries because:
-/// - All interior mutability is protected by Arc<RwLock<...>> or similar synchronization
-/// - The Sandbox and SkillMemory are both Send + Sync
-/// - No raw pointers or unsafe data structures are used
-///
-/// This allows Orchestrator to be used in async contexts that may move between threads
-unsafe impl Send for Orchestrator {}
-
-/// SAFETY: Orchestrator is safe to share references across threads because:
-/// - All state access is guarded by synchronization primitives (Arc<RwLock>)
-/// - The internal components (Sandbox, SkillMemory) are all thread-safe
-/// - No mutable references are leaked outside the struct
-unsafe impl Sync for Orchestrator {}
+// Orchestrator 自动实现 Send + Sync，因为：
+// - 所有内部可变性由 RwLock 保护
+// - Sandbox 和 SkillMemory 都实现了 Send + Sync
+// - 没有使用裸指针或不安全的数据结构
+// 编译器会自动验证这些约束
 
 #[cfg(test)]
 mod tests {

@@ -13,10 +13,27 @@ use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-use std::sync::RwLock;
+use thiserror::Error;
 
 use super::crypto::{CryptoService, EncryptedData};
 use super::rbac::RbacService;
+
+/// API Key 错误类型
+#[derive(Error, Debug)]
+pub enum ApiKeyError {
+    #[error("密钥未找到: {0}")]
+    KeyNotFound(String),
+    #[error("密钥已过期")]
+    KeyExpired,
+    #[error("密钥已禁用")]
+    KeyDisabled,
+    #[error("作用域不足: 需要 {required}, 拥有 {actual}")]
+    InsufficientScope { required: String, actual: String },
+    #[error("加密错误: {0}")]
+    CryptoError(String),
+    #[error("内部错误: {0}")]
+    Internal(String),
+}
 
 /// API 密钥信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -115,14 +132,19 @@ impl ApiKeyAuthResult {
     }
 }
 
+/// API 密钥服务内部状态
+struct ApiKeyServiceInner {
+    /// 密钥存储 (key_id -> encrypted data)
+    keys: HashMap<String, EncryptedData>,
+    /// 密钥信息 (key_id -> info)
+    key_infos: HashMap<String, ApiKeyInfo>,
+    /// 使用记录
+    usage_records: Vec<ApiKeyUsage>,
+}
+
 /// API 密钥服务
 pub struct ApiKeyService {
-    /// 密钥存储 (key_id -> encrypted data)
-    keys: RwLock<HashMap<String, EncryptedData>>,
-    /// 密钥信息 (key_id -> info)
-    key_infos: RwLock<HashMap<String, ApiKeyInfo>>,
-    /// 使用记录
-    usage_records: RwLock<Vec<ApiKeyUsage>>,
+    inner: parking_lot::RwLock<ApiKeyServiceInner>,
     /// 加密服务
     crypto: CryptoService,
     /// RBAC 服务
@@ -136,9 +158,11 @@ impl ApiKeyService {
     /// 创建新的 API 密钥服务
     pub fn new(crypto: CryptoService, rbac: std::sync::Arc<RbacService>) -> Self {
         Self {
-            keys: RwLock::new(HashMap::new()),
-            key_infos: RwLock::new(HashMap::new()),
-            usage_records: RwLock::new(Vec::new()),
+            inner: parking_lot::RwLock::new(ApiKeyServiceInner {
+                keys: HashMap::new(),
+                key_infos: HashMap::new(),
+                usage_records: Vec::new(),
+            }),
             crypto,
             rbac,
             key_prefix: "ak_".to_string(),
@@ -201,21 +225,9 @@ impl ApiKeyService {
         };
 
         // 存储
-        {
-            let mut keys = self
-                .keys
-                .write()
-                .map_err(|_| ApiKeyError::Internal("Key storage lock poisoned".to_string()))?;
-            keys.insert(key_id.clone(), encrypted_key);
-        }
-
-        {
-            let mut infos = self
-                .key_infos
-                .write()
-                .map_err(|_| ApiKeyError::Internal("Key info lock poisoned".to_string()))?;
-            infos.insert(key_id.clone(), key_info);
-        }
+        let mut inner = self.inner.write();
+        inner.keys.insert(key_id.clone(), encrypted_key);
+        inner.key_infos.insert(key_id.clone(), key_info);
 
         Ok(ApiKeyResponse {
             key_id,
@@ -232,11 +244,8 @@ impl ApiKeyService {
         let key_hash = self.hash_key(api_key);
 
         // 查找密钥
-        let infos = match self.key_infos.read() {
-            Ok(infos) => infos,
-            Err(_) => return ApiKeyAuthResult::failure("Key info lock poisoned"),
-        };
-        let key_info = match infos.values().find(|k| k.key_hash == key_hash) {
+        let inner = self.inner.read();
+        let key_info = match inner.key_infos.values().find(|k| k.key_hash == key_hash) {
             Some(info) => info.clone(),
             None => return ApiKeyAuthResult::failure("无效的 API 密钥"),
         };
@@ -287,18 +296,11 @@ impl ApiKeyService {
             ip_address: ip.map(String::from),
         };
 
-        let mut records = self
-            .usage_records
-            .write()
-            .map_err(|_| ApiKeyError::Internal("Usage records lock poisoned".to_string()))?;
-        records.push(record);
+        let mut inner = self.inner.write();
+        inner.usage_records.push(record);
 
         // 更新最后使用时间
-        let mut infos = self
-            .key_infos
-            .write()
-            .map_err(|_| ApiKeyError::Internal("Key info lock poisoned".to_string()))?;
-        if let Some(info) = infos.get_mut(key_id) {
+        if let Some(info) = inner.key_infos.get_mut(key_id) {
             info.last_used_at = Some(chrono::Utc::now());
         }
 
@@ -307,56 +309,44 @@ impl ApiKeyService {
 
     /// 撤销密钥
     pub fn revoke(&self, key_id: &str) -> Result<(), ApiKeyError> {
-        let mut keys = self
-            .keys
-            .write()
-            .map_err(|_| ApiKeyError::Internal("Key storage lock poisoned".to_string()))?;
-        let mut infos = self
-            .key_infos
-            .write()
-            .map_err(|_| ApiKeyError::Internal("Key info lock poisoned".to_string()))?;
-
-        keys.remove(key_id);
-        infos.remove(key_id);
-
+        let mut inner = self.inner.write();
+        inner.keys.remove(key_id);
+        inner.key_infos.remove(key_id);
         Ok(())
     }
 
     /// 禁用密钥
     pub fn disable(&self, key_id: &str) -> Result<(), ApiKeyError> {
-        let mut infos = self
-            .key_infos
-            .write()
-            .map_err(|_| ApiKeyError::Internal("Key info lock poisoned".to_string()))?;
-        if let Some(info) = infos.get_mut(key_id) {
+        let mut inner = self.inner.write();
+        if let Some(info) = inner.key_infos.get_mut(key_id) {
             info.enabled = false;
             Ok(())
         } else {
-            Err(ApiKeyError::KeyNotFound)
+            Err(ApiKeyError::KeyNotFound(key_id.to_string()))
         }
     }
 
     /// 启用密钥
     pub fn enable(&self, key_id: &str) -> Result<(), ApiKeyError> {
-        let mut infos = self
-            .key_infos
-            .write()
-            .map_err(|_| ApiKeyError::Internal("Key info lock poisoned".to_string()))?;
-        if let Some(info) = infos.get_mut(key_id) {
+        let mut inner = self.inner.write();
+        if let Some(info) = inner.key_infos.get_mut(key_id) {
             info.enabled = true;
             Ok(())
         } else {
-            Err(ApiKeyError::KeyNotFound)
+            Err(ApiKeyError::KeyNotFound(key_id.to_string()))
         }
     }
 
     /// 轮换密钥
     pub fn rotate(&self, key_id: &str) -> Result<ApiKeyResponse, ApiKeyError> {
-        let infos = self
-            .key_infos
-            .read()
-            .map_err(|_| ApiKeyError::Internal("Key info lock poisoned".to_string()))?;
-        let old_info = infos.get(key_id).ok_or(ApiKeyError::KeyNotFound)?.clone();
+        let old_info = {
+            let inner = self.inner.read();
+            inner
+                .key_infos
+                .get(key_id)
+                .ok_or_else(|| ApiKeyError::KeyNotFound(key_id.to_string()))?
+                .clone()
+        };
 
         // 创建新密钥
         self.create(CreateApiKeyRequest {
@@ -371,11 +361,8 @@ impl ApiKeyService {
 
     /// 获取所有密钥信息 (不含实际密钥)
     pub fn list_keys(&self) -> Result<Vec<ApiKeyInfo>, ApiKeyError> {
-        let infos = self
-            .key_infos
-            .read()
-            .map_err(|_| ApiKeyError::Internal("Key info lock poisoned".to_string()))?;
-        Ok(infos.values().cloned().collect())
+        let inner = self.inner.read();
+        Ok(inner.key_infos.values().cloned().collect())
     }
 
     /// 获取密钥使用记录
@@ -384,11 +371,9 @@ impl ApiKeyService {
         key_id: &str,
         limit: usize,
     ) -> Result<Vec<ApiKeyUsage>, ApiKeyError> {
-        let records = self
+        let inner = self.inner.read();
+        Ok(inner
             .usage_records
-            .read()
-            .map_err(|_| ApiKeyError::Internal("Usage records lock poisoned".to_string()))?;
-        Ok(records
             .iter()
             .filter(|r| r.key_id == key_id)
             .rev()
@@ -397,38 +382,6 @@ impl ApiKeyService {
             .collect())
     }
 }
-
-/// API 密钥错误类型
-#[derive(Debug, Clone)]
-pub enum ApiKeyError {
-    /// 密钥不存在
-    KeyNotFound,
-    /// 密钥已过期
-    KeyExpired,
-    /// 密钥已禁用
-    KeyDisabled,
-    /// 加密错误
-    CryptoError(String),
-    /// 无效的作用域
-    InvalidScope,
-    /// 内部错误 (如锁中毒)
-    Internal(String),
-}
-
-impl std::fmt::Display for ApiKeyError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ApiKeyError::KeyNotFound => write!(f, "API 密钥不存在"),
-            ApiKeyError::KeyExpired => write!(f, "API 密钥已过期"),
-            ApiKeyError::KeyDisabled => write!(f, "API 密钥已被禁用"),
-            ApiKeyError::CryptoError(msg) => write!(f, "加密错误: {}", msg),
-            ApiKeyError::InvalidScope => write!(f, "无效的作用域"),
-            ApiKeyError::Internal(msg) => write!(f, "内部错误: {}", msg),
-        }
-    }
-}
-
-impl std::error::Error for ApiKeyError {}
 
 /// API 密钥认证中间件
 pub struct ApiKeyMiddleware {

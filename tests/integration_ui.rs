@@ -170,29 +170,34 @@ fn test_agent_info_builder() {
 /// 测试 WebSocket 消息序列化
 #[test]
 fn test_ws_message_serialization() {
+    use arkcore::protocol::{AgentSnapshot, AgentStateLabel, HealthLevel, SystemMetrics};
     use serde_json;
 
     // Agent 状态消息
-    let agent_info = AgentInfo::new("agent-001", "Test Agent").with_status(AgentStatus::Running);
-    let msg = WsMessage::AgentStatus(agent_info);
+    let snapshot = AgentSnapshot {
+        id: "agent-001".to_string(),
+        name: "Test Agent".to_string(),
+        state: AgentStateLabel::Executing,
+        current_task: Some("Processing...".to_string()),
+        step_progress: None,
+    };
+    let msg = WsMessage::AgentStatus(snapshot);
     let json = serde_json::to_string(&msg).expect("序列化失败");
     assert!(json.contains("agent_status"));
 
     // 指标消息
-    let metrics = MetricsData {
-        cpu: 45.5,
-        memory: 62.3,
-        disk: 75.0,
+    let metrics = SystemMetrics {
+        cpu_usage: 45.5,
+        memory_usage: 62.3,
+        disk_usage: 75.0,
         latency_ms: 10,
+        health_level: HealthLevel::Healthy,
+        uptime_seconds: 3600,
+        version: "0.2.1".to_string(),
     };
     let msg = WsMessage::Metrics(metrics);
     let json = serde_json::to_string(&msg).expect("序列化失败");
     assert!(json.contains("metrics"));
-
-    // 连接状态消息
-    let msg = WsMessage::Connection(ConnectionStatus::Connected);
-    let json = serde_json::to_string(&msg).expect("序列化失败");
-    assert!(json.contains("connection"));
 
     // 命令输出消息
     let output = CommandOutput {

@@ -3,6 +3,7 @@
 //! 管理 Agent 状态和历史。
 
 use super::super::{AgentInfo, AgentStatus, MetricsData};
+use crate::protocol::{AgentSnapshot, AgentStateLabel, SystemMetrics, WsMessage};
 
 /// Agent 状态 Hook 状态
 #[derive(Debug, Clone)]
@@ -64,6 +65,54 @@ impl UseAgentState {
                 max_history: max,
             },
         }
+    }
+
+    /// 从 WebSocket 消息更新状态
+    pub fn handle_ws_message(&mut self, msg: &WsMessage) {
+        match msg {
+            WsMessage::AgentStatus(snapshot) => {
+                self.update_from_snapshot(snapshot);
+            }
+            WsMessage::Metrics(metrics) => {
+                self.update_from_system_metrics(metrics);
+            }
+            WsMessage::Output(output) => {
+                // 命令输出可以显示在 UI 中
+                tracing::info!("Command output: {}", output.content);
+            }
+            WsMessage::Error(err) => {
+                tracing::warn!("WebSocket error: {}", err);
+            }
+        }
+    }
+
+    /// 从 AgentSnapshot 更新状态
+    fn update_from_snapshot(&mut self, snapshot: &AgentSnapshot) {
+        let status = match snapshot.state {
+            AgentStateLabel::Idle => AgentStatus::Idle,
+            AgentStateLabel::Planning => AgentStatus::Thinking,
+            AgentStateLabel::Executing => AgentStatus::Running,
+            AgentStateLabel::AwaitingApproval => AgentStatus::Waiting,
+            AgentStateLabel::Reflecting => AgentStatus::Thinking,
+            AgentStateLabel::Completed => AgentStatus::Idle,
+            AgentStateLabel::Failed => AgentStatus::Error,
+        };
+
+        let agent = AgentInfo::new(&snapshot.id, &snapshot.name)
+            .with_status(status)
+            .with_task(snapshot.current_task.clone().unwrap_or_default());
+
+        self.update_agent(agent);
+    }
+
+    /// 从 SystemMetrics 更新状态
+    fn update_from_system_metrics(&mut self, metrics: &SystemMetrics) {
+        self.update_metrics(MetricsData {
+            cpu: metrics.cpu_usage,
+            memory: metrics.memory_usage,
+            disk: metrics.disk_usage,
+            latency_ms: metrics.latency_ms,
+        });
     }
 
     /// 更新 Agent 信息
@@ -137,35 +186,6 @@ impl UseAgentState {
     pub fn state(&self) -> &AgentState {
         &self.state
     }
-
-    /// 创建默认的演示 Agent
-    pub fn with_demo_data() -> Self {
-        let mut state = Self::new();
-
-        state.update_agent(
-            AgentInfo::new("agent-1", "Main Agent")
-                .with_status(AgentStatus::Running)
-                .with_task("Processing user request..."),
-        );
-
-        state
-            .update_agent(AgentInfo::new("agent-2", "Worker Agent").with_status(AgentStatus::Idle));
-
-        state.update_agent(
-            AgentInfo::new("agent-3", "Monitor Agent")
-                .with_status(AgentStatus::Thinking)
-                .with_task("Analyzing system metrics"),
-        );
-
-        state.update_metrics(MetricsData {
-            cpu: 45.5,
-            memory: 62.3,
-            disk: 38.0,
-            latency_ms: 25,
-        });
-
-        state
-    }
 }
 
 impl Default for UseAgentState {
@@ -203,9 +223,21 @@ mod tests {
     }
 
     #[test]
-    fn test_demo_data() {
-        let state = UseAgentState::with_demo_data();
-        assert!(!state.agents().is_empty());
-        assert!(state.metrics().is_some());
+    fn test_handle_ws_message() {
+        let mut state = UseAgentState::new();
+
+        let snapshot = AgentSnapshot {
+            id: "agent-1".to_string(),
+            name: "Main Agent".to_string(),
+            state: AgentStateLabel::Executing,
+            current_task: Some("Processing...".to_string()),
+            step_progress: None,
+        };
+
+        let msg = WsMessage::AgentStatus(snapshot);
+        state.handle_ws_message(&msg);
+
+        assert!(state.current().is_some());
+        assert_eq!(state.current().unwrap().status, AgentStatus::Running);
     }
 }
