@@ -2,11 +2,11 @@
 
 **Local-First OS Agent Engine**
 
-[版本 Shield](https://img.shields.io/badge/version-0.2.0-blue.svg)
+[版本 Shield](https://img.shields.io/badge/version-0.2.1-blue.svg)
 [Rust Shield](https://img.shields.io/badge/rust-1.85-orange.svg)
 [许可证 Shield](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green.svg)
 
-ArkCore 是一个本地优先的操作系统 Agent 引擎，提供 CLI REPL、Dioxus Web UI 和 Axum HTTP Server 三种交互方式。
+ArkCore 是一个本地优先的操作系统 Agent 引擎，提供 CLI REPL 和 Axum HTTP Server 两种交互方式。
 
 ## 核心特性
 
@@ -65,13 +65,7 @@ arkcore repl
 **HTTP 服务器模式**
 
 ```bash
-arkcore serve --port 8080
-```
-
-**Web UI 模式**
-
-```bash
-arkcore web
+arkcore daemon --port 8080
 ```
 
 ## 主要功能
@@ -80,7 +74,6 @@ arkcore web
 |------|----------|
 | CLI | 命令行界面，支持交互式命令输入 |
 | REPL | 读取-执行-打印循环，实时交互 |
-| Web UI | Dioxus 构建的 Web 界面 |
 | Server | Axum HTTP 服务器，支持 WebSocket |
 | LLM | 大语言模型集成接口 |
 | Memory | 本地 SQLite 存储与记忆管理 |

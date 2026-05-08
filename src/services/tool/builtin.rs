@@ -32,7 +32,7 @@ impl Tool for FileRead {
     }
 
     fn description(&self) -> &str {
-        "读取文件内容。输入文件路径，返回文件内容。注意：工作目录为 D:\\Destop\\test\\arkos"
+        "读取文件内容。输入文件路径，返回文件内容。"
     }
 
     fn parameters(&self) -> Schema {
@@ -51,11 +51,12 @@ impl Tool for FileRead {
             ));
         }
 
-        // 如果是相对路径，转换为绝对路径（基于工作目录）
+        // 如果是相对路径，转换为绝对路径（基于当前工作目录）
         let full_path = if Path::new(path).is_absolute() {
             path.to_string()
         } else {
-            format!("D:\\Destop\\test\\arkos\\{}", path)
+            let cwd = std::env::current_dir().map_err(|e| ToolError::IoError(e))?;
+            cwd.join(path).to_string_lossy().to_string()
         };
 
         let content = fs::read_to_string(&full_path)
@@ -120,11 +121,12 @@ impl Tool for FileWrite {
             ));
         }
 
-        // 如果是相对路径，转换为绝对路径
+        // 如果是相对路径，转换为绝对路径（基于当前工作目录）
         let full_path = if Path::new(path).is_absolute() {
             path.to_string()
         } else {
-            format!("D:\\Destop\\test\\arkos\\{}", path)
+            let cwd = std::env::current_dir().map_err(|e| ToolError::IoError(e))?;
+            cwd.join(path).to_string_lossy().to_string()
         };
 
         // 确保父目录存在

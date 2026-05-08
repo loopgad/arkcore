@@ -11,7 +11,6 @@ use clap::{Parser, Subcommand};
 /// Local-First OS Agent Engine
 #[derive(Parser)]
 #[command(name = "arkcore")]
-#[command(version = "1.0")]
 #[command(about = "ArkCore - Local-First OS Agent Engine")]
 pub struct Cli {
     /// 启用详细输出

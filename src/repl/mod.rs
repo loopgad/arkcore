@@ -4,7 +4,6 @@
 
 use rustyline::history::{FileHistory, History};
 use rustyline::{Editor, Result};
-use tracing::info;
 
 pub struct Repl {
     editor: Editor<(), FileHistory>,
@@ -17,18 +16,46 @@ impl Repl {
     }
 
     pub async fn run(&mut self) -> Result<()> {
+        // 显示欢迎信息
+        println!("ArkCore REPL v{}", env!("CARGO_PKG_VERSION"));
+        println!("输入 'help' 查看可用命令，'exit' 退出");
+        println!();
+
         loop {
             let readline = self.editor.readline("arkcore> ");
             match readline {
                 Ok(line) => {
                     self.editor.add_history_entry(&line)?;
-                    if line.trim() == "exit" || line.trim() == "quit" {
-                        break;
+                    let cmd = line.trim();
+
+                    if cmd.is_empty() {
+                        continue;
                     }
-                    info!("执行: {}", line);
+
+                    match cmd {
+                        "exit" | "quit" => break,
+                        "help" | "?" => Self::show_help(),
+                        "clear" | "cls" => {
+                            // 清除屏幕
+                            print!("\x1B[2J\x1B[1;1H");
+                        }
+                        "history" | "hist" => {
+                            let history = self.editor.history();
+                            if history.is_empty() {
+                                println!("暂无历史记录");
+                            } else {
+                                for (i, entry) in history.iter().enumerate() {
+                                    println!("{}: {}", i + 1, entry);
+                                }
+                            }
+                        }
+                        _ => {
+                            println!("未知命令: '{}'。输入 'help' 查看可用命令。", cmd);
+                        }
+                    }
                 }
                 Err(rustyline::error::ReadlineError::Interrupted) => {
-                    info!("使用 'exit' 退出");
+                    println!("使用 'exit' 退出");
                 }
                 Err(rustyline::error::ReadlineError::Eof) => break,
                 Err(e) => {
@@ -43,6 +70,15 @@ impl Repl {
     pub async fn run_script(&mut self, _path: &std::path::Path) -> Result<()> {
         // 读取并执行脚本
         Ok(())
+    }
+
+    /// 显示帮助信息
+    fn show_help() {
+        println!("可用命令:");
+        println!("  help, ?       - 显示此帮助信息");
+        println!("  clear, cls    - 清除屏幕");
+        println!("  history, hist - 显示命令历史");
+        println!("  exit, quit    - 退出 REPL");
     }
 
     /// 添加命令到历史记录
@@ -143,22 +179,18 @@ mod tests {
 
     #[test]
     fn test_repl_editor_creation() {
-        // Test that Repl can be created with default config
         let repl = Repl::new();
         assert!(repl.is_ok());
 
         let repl = repl.unwrap();
-        // Editor should be functional
         assert_eq!(repl.history_len(), 0);
     }
 
     #[test]
     fn test_repl_history_not_duplicated() {
         let mut repl = Repl::new().unwrap();
-        // Adding the same command twice should create two entries
         repl.add_history("same cmd").unwrap();
         repl.add_history("same cmd").unwrap();
-        // rustyline may or may not deduplicate - behavior depends on config
         assert!(repl.history_len() >= 1);
     }
 }

@@ -233,23 +233,71 @@ impl SkillMemory {
     /// 如果用户输入包含这些字符，可能会影响查询行为。
     /// 此函数移除 FTS5 特殊字符，只保留安全的文本内容。
     fn sanitize_fts_query(query: &str) -> String {
-        // FTS5 特殊字符和操作符
-        const FTS5_SPECIAL_CHARS: &[char] = &[
-            '(', ')', '*', ':', '^', '-', '+', '~', '"', 'A', 'N',
-            'O', // AND, NOT, OR 的首字母会被移除
-        ];
+        // FTS5 真实的单字符特殊符号
+        const FTS5_SPECIAL_CHARS: &[char] = &['(', ')', '*', ':', '^', '+', '~'];
+
+        // FTS5 完整操作符关键字（不区分大小写匹配）
+        const FTS5_KEYWORDS: &[&str] = &["AND", "OR", "NOT", "NEAR"];
 
         let mut result = String::with_capacity(query.len());
-        for c in query.chars() {
-            if FTS5_SPECIAL_CHARS.contains(&c) {
-                // 跳过 FTS5 特殊字符
-                // 将 AND, NOT, OR 替换为空格以保留单词分隔
-                if c == 'A' || c == 'N' || c == 'O' {
-                    result.push(' ');
+        let upper: Vec<char> = query.to_uppercase().chars().collect();
+        let chars: Vec<char> = query.chars().collect();
+        let mut i = 0;
+
+        while i < chars.len() {
+            // 检查是否匹配完整的 FTS5 关键字
+            let mut matched_keyword = false;
+            for &keyword in FTS5_KEYWORDS {
+                let kw_len = keyword.len();
+                if i + kw_len <= upper.len()
+                    && upper[i..i + kw_len].iter().collect::<String>() == keyword
+                {
+                    // 确保关键字前后是单词边界
+                    let before_ok = i == 0 || !upper[i - 1].is_alphanumeric();
+                    let after_ok =
+                        i + kw_len >= upper.len() || !upper[i + kw_len].is_alphanumeric();
+                    if before_ok && after_ok {
+                        result.push(' ');
+                        i += kw_len;
+                        matched_keyword = true;
+                        break;
+                    }
                 }
+            }
+
+            if matched_keyword {
                 continue;
             }
+
+            let c = chars[i];
+            if FTS5_SPECIAL_CHARS.contains(&c) {
+                // 跳过特殊符号
+                i += 1;
+                continue;
+            }
+
+            // '-' 特殊处理：行首的 '-' 是 FTS5 NOT 操作符，但中间的 '-' 是普通字符（如 "well-known"）
+            if c == '-' {
+                if i == 0 || result.ends_with(' ') {
+                    // 行首或词首的 '-' 是操作符，跳过
+                    i += 1;
+                    continue;
+                }
+                // 其他位置的 '-' 保留
+                result.push(c);
+                i += 1;
+                continue;
+            }
+
+            // 对 '"' 进行转义
+            if c == '"' {
+                result.push_str("\"\"");
+                i += 1;
+                continue;
+            }
+
             result.push(c);
+            i += 1;
         }
 
         // 折叠多余空格
@@ -450,5 +498,110 @@ mod tests {
         assert_eq!(retrieved.unwrap().access_count, 2);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_sanitize_fts_query_preserves_normal_text() {
+        // 核心测试：确保不破坏正常英文单词
+        assert_eq!(SkillMemory::sanitize_fts_query("Android"), "Android");
+        assert_eq!(SkillMemory::sanitize_fts_query("Network"), "Network");
+        assert_eq!(SkillMemory::sanitize_fts_query("OpenAI"), "OpenAI");
+        assert_eq!(SkillMemory::sanitize_fts_query("JAVA"), "JAVA");
+        assert_eq!(SkillMemory::sanitize_fts_query("Python"), "Python");
+        assert_eq!(SkillMemory::sanitize_fts_query("NODE.JS"), "NODE.JS");
+        assert_eq!(SkillMemory::sanitize_fts_query("Angular"), "Angular");
+        assert_eq!(SkillMemory::sanitize_fts_query("Nginx"), "Nginx");
+        assert_eq!(SkillMemory::sanitize_fts_query("OAuth"), "OAuth");
+    }
+
+    #[test]
+    fn test_sanitize_fts_query_removes_operators() {
+        // 移除 FTS5 完整操作符关键字
+        assert_eq!(
+            SkillMemory::sanitize_fts_query("hello AND world"),
+            "hello world"
+        );
+        assert_eq!(
+            SkillMemory::sanitize_fts_query("hello OR world"),
+            "hello world"
+        );
+        assert_eq!(
+            SkillMemory::sanitize_fts_query("hello NOT world"),
+            "hello world"
+        );
+        assert_eq!(
+            SkillMemory::sanitize_fts_query("hello NEAR world"),
+            "hello world"
+        );
+    }
+
+    #[test]
+    fn test_sanitize_fts_query_case_insensitive_operators() {
+        assert_eq!(
+            SkillMemory::sanitize_fts_query("hello and world"),
+            "hello world"
+        );
+        assert_eq!(
+            SkillMemory::sanitize_fts_query("hello And world"),
+            "hello world"
+        );
+        assert_eq!(
+            SkillMemory::sanitize_fts_query("hello or world"),
+            "hello world"
+        );
+        assert_eq!(
+            SkillMemory::sanitize_fts_query("hello not world"),
+            "hello world"
+        );
+    }
+
+    #[test]
+    fn test_sanitize_fts_query_preserves_partial_operator_words() {
+        // 关键字作为其他单词的一部分时不应被移除
+        assert_eq!(SkillMemory::sanitize_fts_query("ANDROID"), "ANDROID");
+        assert_eq!(SkillMemory::sanitize_fts_query("ANDY"), "ANDY");
+        assert_eq!(SkillMemory::sanitize_fts_query("ANOTHER"), "ANOTHER");
+        assert_eq!(SkillMemory::sanitize_fts_query("NOTABLE"), "NOTABLE");
+        assert_eq!(SkillMemory::sanitize_fts_query("NOTHING"), "NOTHING");
+        assert_eq!(SkillMemory::sanitize_fts_query("NORMAL"), "NORMAL");
+        assert_eq!(SkillMemory::sanitize_fts_query("ORDER"), "ORDER");
+        assert_eq!(SkillMemory::sanitize_fts_query("OREGON"), "OREGON");
+        assert_eq!(SkillMemory::sanitize_fts_query("NEARBY"), "NEARBY");
+    }
+
+    #[test]
+    fn test_sanitize_fts_query_removes_special_symbols() {
+        assert_eq!(SkillMemory::sanitize_fts_query("hello*world"), "helloworld");
+        assert_eq!(SkillMemory::sanitize_fts_query("(hello)"), "hello");
+        assert_eq!(SkillMemory::sanitize_fts_query("col:val"), "colval");
+        assert_eq!(SkillMemory::sanitize_fts_query("hello^world"), "helloworld");
+        assert_eq!(SkillMemory::sanitize_fts_query("+hello"), "hello");
+        assert_eq!(SkillMemory::sanitize_fts_query("~hello"), "hello");
+    }
+
+    #[test]
+    fn test_sanitize_fts_query_handles_dash_correctly() {
+        // 行首 '-' 是操作符，词中间的 '-' 是连字符
+        assert_eq!(SkillMemory::sanitize_fts_query("-hello"), "hello");
+        assert_eq!(SkillMemory::sanitize_fts_query("well-known"), "well-known");
+        assert_eq!(SkillMemory::sanitize_fts_query("X-Ray"), "X-Ray");
+    }
+
+    #[test]
+    fn test_sanitize_fts_query_empty_and_whitespace() {
+        assert_eq!(SkillMemory::sanitize_fts_query(""), "");
+        assert_eq!(SkillMemory::sanitize_fts_query("   "), "");
+        assert_eq!(
+            SkillMemory::sanitize_fts_query(" hello  world "),
+            "hello world"
+        );
+    }
+
+    #[test]
+    fn test_sanitize_fts_query_combined_operators_and_text() {
+        assert_eq!(
+            SkillMemory::sanitize_fts_query("Rust AND (systems OR concurrent) NOT unsafe"),
+            "Rust systems concurrent unsafe"
+        );
     }
 }

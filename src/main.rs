@@ -19,16 +19,22 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // 初始化日志
+    let cli = Cli::parse();
+
+    // 初始化日志级别：--verbose 使用 debug，否则使用 info
+    let log_level = if cli.verbose {
+        "arkcore=debug"
+    } else {
+        "arkcore=info"
+    };
+
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "arkcore=info".into()),
+                .unwrap_or_else(|_| log_level.into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
-
-    let cli = Cli::parse();
 
     match cli.command {
         arkcore::cli::Commands::Repl { init } => {
