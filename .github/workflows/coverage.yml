@@ -25,7 +25,7 @@ jobs:
           components: llvm-tools-preview
 
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cargo/registry
           key: coverage-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
@@ -33,7 +33,7 @@ jobs:
             coverage-cargo-registry-
 
       - name: Cache cargo index
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cargo/git
           key: coverage-cargo-index-${{ hashFiles('**/Cargo.lock') }}
@@ -41,7 +41,7 @@ jobs:
             coverage-cargo-index-
 
       - name: Cache target directory
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: target
           key: coverage-target-${{ hashFiles('**/Cargo.lock') }}
