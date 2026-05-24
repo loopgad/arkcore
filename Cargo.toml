@@ -36,7 +36,7 @@ futures-channel = "0.3"
 reqwest = { version = "0.12", features = ["json", "stream"] }
 
 # ========== 随机数 ==========
-getrandom = "0.2"
+getrandom = "0.4"
 
 # ========== 安全修复 ==========
 # 修复 RUSTSEC-2024-0421: idna 0.5.0 Punycode解码问题
