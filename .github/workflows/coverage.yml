@@ -44,9 +44,9 @@ jobs:
             coverage-target-
 
       - name: Install cargo-llvm-cov
-        uses: taiki-e/cargo-llvm-cov-action@v1
+        uses: taiki-e/install-action@v2
         with:
-          version: latest
+          tool: cargo-llvm-cov
 
       - name: Generate coverage report
         run: cargo llvm-cov --lcov --output-path lcov.info
@@ -78,9 +78,9 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-llvm-cov
-        uses: taiki-e/cargo-llvm-cov-action@v1
+        uses: taiki-e/install-action@v2
         with:
-          version: latest
+          tool: cargo-llvm-cov
 
       - name: Check coverage threshold
         run: cargo llvm-cov --fail-under-lines 50
