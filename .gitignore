@@ -1,8 +1,7 @@
 # Rust build output
 target/
 
-# Binary builds SHOULD keep Cargo.lock for reproducibility
-# Cargo.lock
+# Cargo.lock is tracked for reproducible binary builds
 
 # IDE
 .idea/
@@ -15,11 +14,11 @@ target/
 .DS_Store
 Thumbs.db
 
+# Environment
+.env
+
 # Sisyphus (开发工具)
 .sisyphus/
 
 # Rust
 *.pdb
-
-# Optional: Keep Cargo.lock for binary builds
-# If you want deterministic builds, comment this out

@@ -2,44 +2,55 @@
 
 **Local-First OS Agent Engine**
 
-[版本 Shield](https://img.shields.io/badge/version-0.2.1-blue.svg)
-[Rust Shield](https://img.shields.io/badge/rust-1.85-orange.svg)
-[许可证 Shield](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green.svg)
+[![CI](https://github.com/arkcore/arkcore/actions/workflows/ci.yml/badge.svg)](https://github.com/arkcore/arkcore/actions/workflows/ci.yml)
+[![Coverage](https://github.com/arkcore/arkcore/actions/workflows/coverage.yml/badge.svg)](https://github.com/arkcore/arkcore/actions/workflows/coverage.yml)
+[![Security](https://github.com/arkcore/arkcore/actions/workflows/security.yml/badge.svg)](https://github.com/arkcore/arkcore/actions/workflows/security.yml)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green.svg)](LICENSE)
+[![Rust](https://img.shields.io/badge/rust-1.85+-orange.svg)](https://www.rust-lang.org)
+[![Version](https://img.shields.io/github/v/release/arkcore/arkcore)](https://github.com/arkcore/arkcore/releases)
 
-ArkCore 是一个本地优先的操作系统 Agent 引擎，提供 CLI REPL 和 Axum HTTP Server 两种交互方式。
+ArkCore is a **local-first, privacy-first** OS Agent engine with an extensible plugin architecture. It provides both a CLI REPL and an Axum HTTP Server for flexible interaction modes.
 
-## 核心特性
+## Core Features
 
-- **本地优先架构** - 数据存储在本地，不依赖云服务
-- **多种交互方式** - 同时支持 CLI REPL、Web UI 和 HTTP API
-- **模块化设计** - 核心、LLM、Memory、Orchestrator 等模块清晰分离
-- **安全沙箱** - 提供安全的执行环境
-- **SQLite 持久化** - 内置 SQLite 数据库支持
-- **异步运行时** - 基于 Tokio 的全异步处理
+- **Local-First Architecture** — Data stored locally, no cloud dependency
+- **Multiple Interaction Modes** — CLI REPL, HTTP API, and WebSocket simultaneously
+- **Modular Design** — Core, LLM, Memory, Orchestrator, Sandbox modules cleanly separated
+- **Secure Sandbox** — Zero-trust execution environment with 6-layer security checks
+- **SQLite Persistence** — Built-in FTS5-powered local storage
+- **Async Runtime** — Fully asynchronous processing powered by Tokio
+- **Cross-Platform** — Full support for Linux, macOS, and Windows
 
-## 模块架构
+## Module Architecture
 
 ```
 arkcore/
-├── cli/          # 命令行接口
-├── core/         # 核心功能
-├── llm/          # LLM 集成
-├── memory/       # 本地存储与记忆
-├── orchestrator/ # 任务编排
-├── platform/     # 平台相关功能
-├── repl/         # REPL 交互引擎
-├── sandbox/      # 安全沙箱
-├── security/     # 安全与加密
-├── server/       # HTTP 服务器
-├── services/     # 业务服务
-└── web/          # Dioxus Web UI
+├── cli/          # CLI argument parsing
+├── core/         # Core abstractions (traits, config, DI)
+├── llm/          # LLM provider integration
+├── memory/       # SQLite FTS5 memory engine
+├── orchestrator/ # Task orchestration (state machine)
+├── platform/     # Cross-platform abstractions
+├── repl/         # Interactive REPL engine
+├── sandbox/      # Zero-trust execution sandbox
+├── security/     # Security & compliance auditing
+├── server/       # Axum HTTP + WebSocket server
+└── services/     # Reliability & performance services
 ```
 
-## 快速开始
+## Quick Start
 
-### 安装
+### Installation
 
-**从源码编译**
+**From pre-built binary** (download from [Releases](https://github.com/arkcore/arkcore/releases)):
+
+```bash
+# Download the appropriate binary for your platform
+chmod +x arkcore
+./arkcore repl
+```
+
+**From source:**
 
 ```bash
 git clone https://github.com/arkcore/arkcore.git
@@ -48,42 +59,35 @@ cargo build --release
 cargo install --path .
 ```
 
-**依赖要求**
+**Prerequisites:**
 
-- Rust 1.85+
+- Rust 1.85+ (MSRV)
 - SQLite
-- OpenSSL (Unix) 或 Windows SDK
+- OpenSSL (Unix) or Windows SDK
 
-### 使用方式
+### Usage
 
-**CLI REPL 模式**
+**CLI REPL mode:**
 
 ```bash
 arkcore repl
 ```
 
-**HTTP 服务器模式**
+**HTTP Server mode:**
 
 ```bash
 arkcore daemon --port 8080
 ```
 
-## 主要功能
+**With verbose logging:**
 
-| 模块 | 功能描述 |
-|------|----------|
-| CLI | 命令行界面，支持交互式命令输入 |
-| REPL | 读取-执行-打印循环，实时交互 |
-| Server | Axum HTTP 服务器，支持 WebSocket |
-| LLM | 大语言模型集成接口 |
-| Memory | 本地 SQLite 存储与记忆管理 |
-| Orchestrator | 任务编排与调度 |
-| Sandbox | 安全沙箱执行环境 |
-| Security | 加密、认证与安全验证 |
+```bash
+arkcore -v repl
+```
 
-## 配置
+## Configuration
 
-ArkCore 默认配置位于 `~/.arkcore/config.toml`。首次运行时会自动创建。
+ArkCore reads configuration from `~/.config/arkcore/config.toml` on first run. Alternatively, use environment variables (see `.env.example`):
 
 ```toml
 [server]
@@ -94,32 +98,49 @@ port = 8080
 path = "~/.arkcore/data.db"
 
 [security]
-encryption = true
+sandbox_enabled = true
 ```
 
-## 开发
+## Main Features
+
+| Module | Description |
+|--------|-------------|
+| CLI | Command-line interface with subcommand parsing |
+| REPL | Read-Eval-Print Loop with history support |
+| Server | Axum HTTP server with WebSocket and SSE |
+| LLM | LLM provider abstraction (OpenAI, Anthropic, Ollama) |
+| Memory | Local SQLite FTS5 storage and memory management |
+| Orchestrator | Task orchestration & state machine scheduling |
+| Sandbox | Zero-trust command execution sandbox |
+| Security | Encryption, RBAC, compliance reports |
+
+## Development
 
 ```bash
-# 运行测试
+# Run all tests
 cargo test
 
-# 运行基准测试
-cargo bench
+# Run tests with coverage
+cargo llvm-cov --lib --html
 
-# 代码格式检查
-cargo fmt --check
+# Format check
+cargo fmt -- --check
 
-# _clippy 检查
+# Clippy lint
 cargo clippy -- -D warnings
+
+# Release build
+cargo build --release
 ```
 
-## 贡献
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full development guidelines.
 
-欢迎提交 Issue 和 Pull Request。重大更改请先开 Issue 讨论。
+## License
 
-## 许可证
+Licensed under either of:
 
-本项目基于 **MIT OR Apache-2.0** 许可证分发。
+- MIT license ([LICENSE-MIT](LICENSE-MIT) or https://opensource.org/licenses/MIT)
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or https://www.apache.org/licenses/LICENSE-2.0)
 
 ---
 

@@ -16,10 +16,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-action@stable
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
         with:
-          version: stable
+          path: ~/.cargo/registry
+          key: coverage-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            coverage-cargo-registry-
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: coverage-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            coverage-cargo-index-
+
+      - name: Cache target directory
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: coverage-target-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            coverage-target-
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/cargo-llvm-cov-action@v1
@@ -33,7 +55,7 @@ jobs:
         uses: codecov/codecov-action@v4
         with:
           files: lcov.info
-          fail_ci_if_error: false
+          fail_ci_if_error: true
 
       - name: Generate HTML report
         run: cargo llvm-cov --html
@@ -52,10 +74,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-action@stable
-        with:
-          version: stable
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/cargo-llvm-cov-action@v1

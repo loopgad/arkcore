@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            artifact_name: arkcore
+            asset_name: arkcore-x86_64-linux
+          - os: windows-latest
+            artifact_name: arkcore.exe
+            asset_name: arkcore-x86_64-windows.exe
+          - os: macos-latest
+            artifact_name: arkcore
+            asset_name: arkcore-x86_64-darwin
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache target directory
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: release-${{ runner.os }}-target-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            release-${{ runner.os }}-target-
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: target/release/${{ matrix.artifact_name }}
+          retention-days: 1
+
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Generate release notes
+        run: |
+          echo "## 安装方式" > release-notes.md
+          echo "" >> release-notes.md
+          echo '```bash' >> release-notes.md
+          echo "cargo install --git https://github.com/arkcore/arkcore --tag ${{ github.ref_name }}" >> release-notes.md
+          echo '```' >> release-notes.md
+          echo "" >> release-notes.md
+          echo "### 二进制文件" >> release-notes.md
+          echo "- [arkcore-x86_64-linux](arkcore-x86_64-linux)" >> release-notes.md
+          echo "- [arkcore-x86_64-windows.exe](arkcore-x86_64-windows.exe)" >> release-notes.md
+          echo "- [arkcore-x86_64-darwin](arkcore-x86_64-darwin)" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "---" >> release-notes.md
+          echo "" >> release-notes.md
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ArkCore ${{ github.ref_name }}
+          body_path: release-notes.md
+          files: |
+            artifacts/arkcore-x86_64-linux/arkcore
+            artifacts/arkcore-x86_64-windows.exe/arkcore.exe
+            artifacts/arkcore-x86_64-darwin/arkcore
+          fail_on_unmatched_files: true

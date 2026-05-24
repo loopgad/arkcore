@@ -31,6 +31,12 @@ For stricter linting:
 cargo clippy -- -D warnings
 ```
 
+Check code formatting:
+
+```bash
+cargo fmt -- --check
+```
+
 ## Testing
 
 ### Run All Tests
@@ -39,8 +45,14 @@ cargo clippy -- -D warnings
 # Run library tests
 cargo test --lib
 
+# Run doc tests
+cargo test --doc
+
 # Run integration tests
 cargo test --test '*'
+
+# Run all tests at once
+cargo test
 ```
 
 ### Test Coverage
@@ -73,6 +85,27 @@ Run ArkCore as a background server:
 cargo run --release -- daemon
 ```
 
+## CI/CD
+
+This project uses GitHub Actions for continuous integration:
+
+- **CI**: Runs tests, formatting checks, and Clippy on ubuntu-latest, windows-latest, and macos-latest
+- **Coverage**: Generates code coverage reports and uploads to Codecov
+- **Security**: Runs weekly cargo-audit scans for dependency vulnerabilities
+- **Release**: Automatically builds and publishes binaries when a tag (v*) is pushed
+
+All CI checks must pass before merging pull requests.
+
+## Environment Variables
+
+Copy `.env.example` to `.env` and customize as needed:
+
+```bash
+cp .env.example .env
+```
+
+See `.env.example` for all available configuration options.
+
 ## Windows Platform Notes
 
 Some tests may fail on Windows due to Unix command compatibility issues. The sandbox module uses Unix commands like `ls` and `rm` which are not available on Windows by default.
@@ -90,6 +123,9 @@ ArkCore consists of the following modules:
 - **Memory**: Persistent memory storage
 - **Orchestrator**: Task orchestration
 - **LLM**: Language model integration
+- **Security**: Security auditing and compliance
+- **Platform**: Cross-platform abstractions
+- **Services**: Reliability, performance, and security services
 
 ## Getting Help
 
