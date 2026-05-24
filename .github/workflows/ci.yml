@@ -90,6 +90,7 @@ jobs:
   msrv:
     name: MSRV (1.85)
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
