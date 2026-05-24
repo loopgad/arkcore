@@ -41,4 +41,4 @@ jobs:
         run: cargo install cargo-audit --locked
 
       - name: Run cargo-audit
-        run: cargo audit --deny Critical --deny High
+        run: cargo audit -D warnings

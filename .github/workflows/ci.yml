@@ -16,6 +16,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install system dependencies
+        run: sudo apt-get install -y libsqlite3-dev libssl-dev
+
       - name: Install Rust (stable)
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -38,6 +41,15 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install system dependencies (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            sudo apt-get update && sudo apt-get install -y libsqlite3-dev libssl-dev
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            brew install sqlite3 openssl || true
+          fi
 
       - name: Install Rust (stable)
         uses: dtolnay/rust-toolchain@stable
@@ -77,6 +89,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev libssl-dev
 
       - name: Install Rust (MSRV 1.85)
         uses: dtolnay/rust-toolchain@1.85
