@@ -33,7 +33,7 @@ tokio-tungstenite = "0.29"
 futures-channel = "0.3"
 
 # ========== HTTP 客户端 ==========
-reqwest = { version = "0.12", features = ["json", "stream"] }
+reqwest = { version = "0.13", features = ["json", "stream"] }
 
 # ========== 随机数 ==========
 getrandom = "0.2"
