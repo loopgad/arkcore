@@ -67,7 +67,7 @@ sha2 = "0.10"
 base64 = "0.22"
 zeroize = { version = "1.8", features = ["derive"] }
 pbkdf2 = "0.12"
-hmac = "0.12"
+hmac = "0.13"
 parking_lot = "0.12"
 
 # ========== 性能优化 ==========
