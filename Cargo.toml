@@ -72,7 +72,7 @@ parking_lot = "0.12"
 
 # ========== 性能优化 ==========
 moka = { version = "0.12", features = ["sync"] }
-bbqueue = "0.4"
+bbqueue = "0.7"
 ahash = "0.8"
 
 [target.'cfg(windows)'.dependencies]
