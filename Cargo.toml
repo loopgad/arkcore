@@ -66,7 +66,7 @@ rand = "0.8"
 sha2 = "0.10"
 base64 = "0.22"
 zeroize = { version = "1.8", features = ["derive"] }
-pbkdf2 = "0.12"
+pbkdf2 = "0.13"
 hmac = "0.12"
 parking_lot = "0.12"
 
